@@ -1,0 +1,152 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import sqlite3
+import re
+
+verbose = False
+
+
+def getClipPath():
+    """Return path of "My Clippings.txt", written by Kindle.
+    """
+
+    if sys.platform == 'darwin':
+        return "/Volumes/Kindle/documents/My Clippings.txt"
+
+    raise Exception("Platform %s not support." % sys.platform)
+
+
+R_MATCH_ENTRY = re.compile(
+    u'^(.*?)\n- (.*?) \\| (.*?)\n(.*?)\n==========', re.DOTALL | re.MULTILINE)
+
+TABLE_NAME = 'my_clippings'
+
+SQL_CREATE = '''
+create table if not exists %s
+    (
+      ID BIGINT PRIMARY KEY NOT NULL,
+      BOOK TEXT,
+      POSITION TEXT,
+      TIMESTAMP TEXT,
+      CONTENT TEXT
+    );
+''' % TABLE_NAME
+
+INSERT_FMT = 'insert into %s values ' % TABLE_NAME + \
+    '''(%u, '%s', '%s', '%s', '%s');'''
+
+
+QUERY_FMT = "select id, book from %s where ID = " % TABLE_NAME + "%u"
+
+
+class Database(object):
+    def __init__(self, path=''):
+        """
+        """
+        super(Database, self).__init__()
+        self.conn = sqlite3.connect('klip.db')
+        self.c = self.conn.cursor()
+        self.execute(SQL_CREATE, True)
+
+    def execute(self, sql, commit=True):
+        """
+        Execute sql, and commit commit if asked.
+        """
+        try:
+            self.c.execute(sql)
+        except sqlite3.IntegrityError as e:
+            print('DUP: %s' % e)
+        except Exception as e:
+            print('FATAL: %s -- %s' % (e, sql))
+            exit(1)
+
+        if commit:
+            self.conn.commit()
+
+        return self.c
+
+    def __del__(self):
+        """
+        """
+        self.conn.commit()
+        self.conn.close()
+        pass
+
+
+def handleStr(ins):
+    """
+
+    Arguments:
+    - `s`:
+    """
+    ins.strip()
+
+    out = ''
+
+    for s in ins:
+        if s == "'":
+            s = '"'
+        out += s
+    return out
+
+
+PAGE_SIZE = 4096
+
+
+def main():
+    path = getClipPath()
+    if not os.path.exists(path):
+        path = "/Volumes/yyc/Documents/My Clippings.txt"
+
+        db = Database()
+
+    with open(path) as fd:
+        while True:
+            content = fd.read(PAGE_SIZE)
+            if content is None:
+                break
+            if len(content) == 0:
+                break
+            pos = 0
+            while True:
+                m = R_MATCH_ENTRY.search(content, pos)
+                if m is None:
+                    # print('Match failed, pos: %d, content: %s' % (pos,
+                    #                                               content[pos:]))
+
+                    new_content = fd.read(PAGE_SIZE)
+                    if len(new_content) == 0:
+                        print('EOF reached...')
+                        sys.exit(1)
+                    else:
+                        content = content[pos:] + new_content
+                        pos = 0
+                else:
+                    book = handleStr(m.group(1).strip())
+                    page = handleStr(m.group(2).strip())
+                    time = handleStr(m.group(3).strip())
+                    mark = handleStr(m.group(4).strip())
+                    pos = m.end(0)
+
+                    if len(mark) == 0:
+                        continue
+
+                    value = book + "_" + mark
+                    key = hash(value) % ((sys.maxsize + 1) * 2)
+                    cur = db.execute(QUERY_FMT % (key))
+                    row = cur.fetchone()
+
+                    if row is None:
+                        db.execute(INSERT_FMT %
+                                   (key, book, page, time, mark), False)
+                    else:
+                        if verbose:
+                            print('Item skip: %s' % (row))
+                        pass
+
+
+
+if __name__ == '__main__':
+    main()
