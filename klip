@@ -4,6 +4,7 @@ import sys
 import os
 import sqlite3
 import re
+import wx
 
 verbose = False
 
@@ -16,6 +17,24 @@ def getClipPath():
         return "/Volumes/Kindle/documents/My Clippings.txt"
 
     raise Exception("Platform %s not support." % sys.platform)
+
+
+def getDBPath(readonly=False):
+    """Return path of database.
+    """
+    if sys.platform == 'darwin':
+        path = '%s/Library/Application Support/Klip/' % os.getenv("HOME")
+    else:
+        raise Exception("Platform %s not support." % sys.platform)
+
+    if not os.path.exists(path):
+        os.mkdir(path)
+    path += 'klip.db'
+
+    if readonly:
+        path += '?mode = ro'
+
+    return path
 
 
 R_MATCH_ENTRY = re.compile(
@@ -42,11 +61,11 @@ QUERY_FMT = "select id, book from %s where ID = " % TABLE_NAME + "%u"
 
 
 class Database(object):
-    def __init__(self, path=''):
+    def __init__(self, readonly=False):
         """
         """
         super(Database, self).__init__()
-        self.conn = sqlite3.connect('klip.db')
+        self.conn = sqlite3.connect(getDBPath(readonly))
         self.c = self.conn.cursor()
         self.execute(SQL_CREATE, True)
 
@@ -100,7 +119,7 @@ def main():
     if not os.path.exists(path):
         path = "/Volumes/yyc/Documents/My Clippings.txt"
 
-        db = Database()
+    db = Database()
 
     with open(path) as fd:
         while True:
@@ -147,6 +166,130 @@ def main():
                         pass
 
 
+class KlipFrame(wx.Frame):
+    """
+    """
+
+    def __init__(self):
+        """
+        """
+
+        super(KlipFrame, self).__init__(None, size=wx.Size(800, 600))
+        # ensure the parent's __init__ is called
+
+        self.SetMinSize(wx.Size(800, 600))
+
+        sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
+        sp.SetSplitMode(wx.SPLIT_VERTICAL)
+        sp.SetMinimumPaneSize(50)
+
+        # create a panel in the frame
+        pnl_books = wx.Panel(sp)
+        pnl_clips = wx.Panel(sp)
+        pnl_clips.SetBackgroundColour(wx.Colour(255, 255, 255))
+
+        sp.SplitVertically(pnl_books, pnl_clips, int(
+            round(self.GetSize().GetWidth() * 0.4)))
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.Button(pnl_books, -1, 'Search box will be here'),
+                  0, wx.EXPAND, 0)
+
+        # and put some text with a larger bold font on it
+        id = wx.NewId()
+        self.book_list = wx.ListView(
+            pnl_books, id,
+            style=wx.LC_REPORT | wx.SUNKEN_BORDER | wx.LC_NO_HEADER | wx.LC_SINGLE_SEL)
+
+        self.book_list.InsertColumn(0, "Book")
+        self.book_list.Show(True)
+
+        sizer.Add(self.book_list, 1, wx.EXPAND, 0)
+
+        pnl_books.SetSizer(sizer)
+
+        # 0 will insert at the start of the list
+        pos = self.book_list.InsertStringItem(0, "book 1")
+        pos = self.book_list.InsertStringItem(1, "book 2")
+        pos = self.book_list.InsertStringItem(2, "book 3")
+        pos = self.book_list.InsertStringItem(3, "book 4")
+
+        st2 = wx.StaticText(pnl_clips, label="Hello World2!", pos=(25, 25))
+        font = st2.GetFont()
+        font.PointSize += 10
+        font = font.Bold()
+        st2.SetFont(font)
+
+        # create a menu bar
+        self.makeMenuBar()
+
+    def makeMenuBar(self):
+        """
+        A menu bar is composed of menus, which are composed of menu items.
+        This method builds a set of menus and binds handlers to be called
+        when the menu item is selected.
+        """
+
+        # Make a file menu with Hello and Exit items
+        fileMenu = wx.Menu()
+        # The "\t..." syntax defines an accelerator key that also triggers
+        # the same event
+        helloItem = fileMenu.Append(-1, "&Hello...\tCtrl-H",
+                                    "Help string shown in status bar for this menu item")
+        fileMenu.AppendSeparator()
+        # When using a stock ID we don't need to specify the menu item's
+        # label
+        exitItem = fileMenu.Append(wx.ID_EXIT)
+
+        # Now a help menu for the about item
+        helpMenu = wx.Menu()
+        aboutItem = helpMenu.Append(wx.ID_ABOUT)
+
+        # Make the menu bar and add the two menus to it. The '&' defines
+        # that the next letter is the "mnemonic" for the menu item. On the
+        # platforms that support it those letters are underlined and can be
+        # triggered from the keyboard.
+        menuBar = wx.MenuBar()
+        menuBar.Append(fileMenu, "&File")
+        menuBar.Append(helpMenu, "&Help")
+
+        # Give the menu bar to the frame
+        self.SetMenuBar(menuBar)
+
+        # Finally, associate a handler function with the EVT_MENU event for
+        # each of the menu items. That means that when that menu item is
+        # activated then the associated handler function will be called.
+        self.Bind(wx.EVT_MENU, self.OnHello, helloItem)
+        self.Bind(wx.EVT_MENU, self.OnExit,  exitItem)
+        self.Bind(wx.EVT_MENU, self.OnAbout, aboutItem)
+
+    def OnExit(self, event):
+        """Close the frame, terminating the application."""
+        self.Close(True)
+
+    def OnHello(self, event):
+        """Say hello to the user."""
+        wx.MessageBox("Hello again from wxPython")
+
+    def OnAbout(self, event):
+        """Display an About Dialog"""
+        wx.MessageBox("This is a wxPython Hello World sample",
+                      "About Hello World 2",
+                      wx.OK | wx.ICON_INFORMATION)
+
+
+def start_app():
+    """
+    """
+    app = wx.App()
+    frm = KlipFrame()
+
+    # Show it.
+    frm.Show()
+    app.MainLoop()
+    pass
+
 
 if __name__ == '__main__':
-    main()
+    # main()
+    start_app()
