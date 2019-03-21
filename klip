@@ -79,7 +79,7 @@ CLIP_CREATE = '''
 create table if not exists %s
     (
       ID BIGINT PRIMARY KEY NOT NULL,
-      BOOK BIGINT,
+      BOOK TEXT,
       POSITION TEXT,
       TIMESTAMP TEXT,
       CONTENT TEXT
@@ -170,6 +170,7 @@ class KlipFrame(wx.Frame):
         super(KlipFrame, self).__init__(None, size=wx.Size(800, 600))
         # ensure the parent's __init__ is called
 
+        self.db = Database()
         self.SetMinSize(wx.Size(800, 600))
 
         sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
@@ -190,23 +191,16 @@ class KlipFrame(wx.Frame):
 
         # and put some text with a larger bold font on it
         id = wx.NewId()
-        self.book_list = wx.ListView(
-            pnl_books, id,
-            style=wx.LC_REPORT | wx.SUNKEN_BORDER |
-            wx.LC_NO_HEADER | wx.LC_SINGLE_SEL)
+        self.book_list = wx.ListCtrl(pnl_books,
+                                     wx.ID_ANY,
+                                     style=wx.LC_REPORT | wx.LC_NO_HEADER|
+                                     wx.LC_HRULES | wx.LC_SINGLE_SEL)
 
-        self.book_list.InsertColumn(0, "Book")
-        self.book_list.Show(True)
+        self.FillBooks()
 
-        sizer.Add(self.book_list, 1, wx.EXPAND, 0)
+        sizer.Add(self.book_list, 1, wx.EXPAND | wx.ALL, 0)
 
         pnl_books.SetSizer(sizer)
-
-        # 0 will insert at the start of the list
-        self.book_list.InsertStringItem(0, "book 1")
-        self.book_list.InsertStringItem(1, "book 2")
-        self.book_list.InsertStringItem(2, "book 3")
-        self.book_list.InsertStringItem(3, "book 4")
 
         st2 = wx.StaticText(pnl_clips, label="Hello World2!", pos=(25, 25))
         font = st2.GetFont()
@@ -217,7 +211,6 @@ class KlipFrame(wx.Frame):
         # create a menu bar
         self.makeMenuBar()
 
-        self.db = Database()
 
         pass
 
@@ -330,7 +323,7 @@ class KlipFrame(wx.Frame):
 
                         if row is None:
                             self.db.execute(CLIP_INSERT_FMT %
-                                            (clip_key, book_key, page, time, mark),
+                                            (clip_key, book, page, time, mark),
                                             False)
                             records_added += 1
 
@@ -341,6 +334,32 @@ class KlipFrame(wx.Frame):
         wx.MessageBox("This is a wxPython Hello World sample",
                       "About Hello World 2",
                       wx.OK | wx.ICON_INFORMATION)
+
+    def FillBooks(self):
+        """Fill book list.
+        """
+        self.book_list.Show(True)
+        self.book_list.ClearAll()
+        self.book_list.SetBackgroundColour(wx.Colour(0xf6, 0xf6, 0xf6))
+
+
+        self.book_list.InsertColumn(0, "Book")
+        # 0 will insert at the start of the list
+
+        cur = self.db.execute('select book from %s' % BOOK_TABLE)
+        idx = 0
+
+        while True:
+            r = cur.fetchone()
+            if r is None:
+                break
+            book = r[0]
+
+            self.book_list.InsertStringItem(idx, book)
+            idx += 1
+
+        self.book_list.SetColumnWidth(0, wx.LIST_AUTOSIZE_USEHEADER)
+        pass
 
 
 def start_app():
