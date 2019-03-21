@@ -1,10 +1,12 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import sys
 import os
 import sqlite3
 import re
 import wx
+import codecs
 
 verbose = False
 
@@ -37,27 +39,69 @@ def getDBPath(readonly=False):
     return path
 
 
+boms = [codecs.BOM_UTF8]
+reps = [('（', '('), ('）', ')'), ('（', '('), ('）',')')]
+r_match_book = re.compile('(.*?)\(.*?\)', re.DOTALL)
+
+
+def process_book_name(name):
+    """
+    Process book name.
+    Arguments:
+    - `name`:
+    """
+
+    # replace some  charachters.
+    for (k, v) in reps:
+        name = name.replace(k, v)
+
+    # merge multiple white spaces
+    name = ' '.join(name.strip().split())
+
+    m = r_match_book.match(name)
+    if m:
+        name = m.group(1)
+
+        # remove BOMs first
+    for bom in boms:
+        if name.startswith(bom):
+            name = name[len(bom):]
+
+    return name
+
+
 R_MATCH_ENTRY = re.compile(
     u'^(.*?)\n- (.*?) \\| (.*?)\n(.*?)\n==========', re.DOTALL | re.MULTILINE)
 
-TABLE_NAME = 'my_clippings'
+CLIP_TABLE = 'clippings'
 
-SQL_CREATE = '''
+CLIP_CREATE = '''
 create table if not exists %s
     (
       ID BIGINT PRIMARY KEY NOT NULL,
-      BOOK TEXT,
+      BOOK BIGINT,
       POSITION TEXT,
       TIMESTAMP TEXT,
       CONTENT TEXT
     );
-''' % TABLE_NAME
+''' % CLIP_TABLE
 
-INSERT_FMT = 'insert into %s values ' % TABLE_NAME + \
+CLIP_INSERT_FMT = 'insert into %s values ' % CLIP_TABLE + \
     '''(%u, '%s', '%s', '%s', '%s');'''
 
+QUERY_CLIP_FMT = "select id, book from %s where ID = " % CLIP_TABLE + "%u"
 
-QUERY_FMT = "select id, book from %s where ID = " % TABLE_NAME + "%u"
+BOOK_TABLE = 'books'
+BOOK_CREATE = '''
+create table if not exists %s
+(
+      ID BIGINT PRIMARY KEY NOT NULL,
+      BOOK TEXT
+)
+''' % BOOK_TABLE
+BOOK_INSERT_FMT = 'insert into %s values ' % BOOK_TABLE + \
+    '''(%u, '%s');'''
+QUERY_BOOK_FMT = "select id, book from %s where ID = " % BOOK_TABLE + "%u"
 
 
 class Database(object):
@@ -67,7 +111,8 @@ class Database(object):
         super(Database, self).__init__()
         self.conn = sqlite3.connect(getDBPath(readonly))
         self.c = self.conn.cursor()
-        self.execute(SQL_CREATE, True)
+        self.execute(CLIP_CREATE, True)
+        self.execute(BOOK_CREATE, True)
 
     def execute(self, sql, commit=True):
         """
@@ -114,58 +159,6 @@ def handleStr(ins):
 PAGE_SIZE = 4096
 
 
-def main():
-    path = getClipPath()
-    if not os.path.exists(path):
-        path = "/Volumes/yyc/Documents/My Clippings.txt"
-
-    db = Database()
-
-    with open(path) as fd:
-        while True:
-            content = fd.read(PAGE_SIZE)
-            if content is None:
-                break
-            if len(content) == 0:
-                break
-            pos = 0
-            while True:
-                m = R_MATCH_ENTRY.search(content, pos)
-                if m is None:
-                    # print('Match failed, pos: %d, content: %s' % (pos,
-                    #                                               content[pos:]))
-
-                    new_content = fd.read(PAGE_SIZE)
-                    if len(new_content) == 0:
-                        print('EOF reached...')
-                        sys.exit(1)
-                    else:
-                        content = content[pos:] + new_content
-                        pos = 0
-                else:
-                    book = handleStr(m.group(1).strip())
-                    page = handleStr(m.group(2).strip())
-                    time = handleStr(m.group(3).strip())
-                    mark = handleStr(m.group(4).strip())
-                    pos = m.end(0)
-
-                    if len(mark) == 0:
-                        continue
-
-                    value = book + "_" + mark
-                    key = hash(value) % ((sys.maxsize + 1) * 2)
-                    cur = db.execute(QUERY_FMT % (key))
-                    row = cur.fetchone()
-
-                    if row is None:
-                        db.execute(INSERT_FMT %
-                                   (key, book, page, time, mark), False)
-                    else:
-                        if verbose:
-                            print('Item skip: %s' % (row))
-                        pass
-
-
 class KlipFrame(wx.Frame):
     """
     """
@@ -199,7 +192,8 @@ class KlipFrame(wx.Frame):
         id = wx.NewId()
         self.book_list = wx.ListView(
             pnl_books, id,
-            style=wx.LC_REPORT | wx.SUNKEN_BORDER | wx.LC_NO_HEADER | wx.LC_SINGLE_SEL)
+            style=wx.LC_REPORT | wx.SUNKEN_BORDER |
+            wx.LC_NO_HEADER | wx.LC_SINGLE_SEL)
 
         self.book_list.InsertColumn(0, "Book")
         self.book_list.Show(True)
@@ -209,10 +203,10 @@ class KlipFrame(wx.Frame):
         pnl_books.SetSizer(sizer)
 
         # 0 will insert at the start of the list
-        pos = self.book_list.InsertStringItem(0, "book 1")
-        pos = self.book_list.InsertStringItem(1, "book 2")
-        pos = self.book_list.InsertStringItem(2, "book 3")
-        pos = self.book_list.InsertStringItem(3, "book 4")
+        self.book_list.InsertStringItem(0, "book 1")
+        self.book_list.InsertStringItem(1, "book 2")
+        self.book_list.InsertStringItem(2, "book 3")
+        self.book_list.InsertStringItem(3, "book 4")
 
         st2 = wx.StaticText(pnl_clips, label="Hello World2!", pos=(25, 25))
         font = st2.GetFont()
@@ -222,6 +216,10 @@ class KlipFrame(wx.Frame):
 
         # create a menu bar
         self.makeMenuBar()
+
+        self.db = Database()
+
+        pass
 
     def makeMenuBar(self):
         """
@@ -234,8 +232,8 @@ class KlipFrame(wx.Frame):
         fileMenu = wx.Menu()
         # The "\t..." syntax defines an accelerator key that also triggers
         # the same event
-        helloItem = fileMenu.Append(-1, "&Hello...\tCtrl-H",
-                                    "Help string shown in status bar for this menu item")
+        loadItem = fileMenu.Append(-1, "&Load...\tCtrl-L",
+                                   "Load clippings...")
         fileMenu.AppendSeparator()
         # When using a stock ID we don't need to specify the menu item's
         # label
@@ -259,7 +257,7 @@ class KlipFrame(wx.Frame):
         # Finally, associate a handler function with the EVT_MENU event for
         # each of the menu items. That means that when that menu item is
         # activated then the associated handler function will be called.
-        self.Bind(wx.EVT_MENU, self.OnHello, helloItem)
+        self.Bind(wx.EVT_MENU, self.OnLoadFile, loadItem)
         self.Bind(wx.EVT_MENU, self.OnExit,  exitItem)
         self.Bind(wx.EVT_MENU, self.OnAbout, aboutItem)
 
@@ -267,8 +265,75 @@ class KlipFrame(wx.Frame):
         """Close the frame, terminating the application."""
         self.Close(True)
 
-    def OnHello(self, event):
+    def OnLoadFile(self, event):
         """Say hello to the user."""
+
+        books_added = 0
+        records_added = 0
+
+        path = getClipPath()
+        if not os.path.exists(path):
+            path = "/Volumes/yyc/Documents/My Clippings.txt"
+
+        with open(path) as fd:
+            while True:
+                content = fd.read(PAGE_SIZE)
+                if content is None:
+                    break
+                if len(content) == 0:
+                    break
+                pos = 0
+                while True:
+                    m = R_MATCH_ENTRY.search(content, pos)
+                    if m is None:
+                        new_content = fd.read(PAGE_SIZE)
+                        if len(new_content) == 0:
+                            print('New books: %d, new records: %d' %
+                                  (books_added, records_added))
+                            print('EOF reached...')
+                            return
+                        else:
+                            content = content[pos:] + new_content
+                            pos = 0
+                    else:
+                        book = handleStr(process_book_name(m.group(1)))
+                        page = handleStr(m.group(2).strip())
+                        time = handleStr(m.group(3).strip())
+                        mark = handleStr(m.group(4).strip())
+                        pos = m.end(0)
+
+                        if len(mark) == 0:
+                            continue
+
+                        value = book + "_" + mark
+
+                        clip_key = hash(value) % ((sys.maxsize + 1) * 2)
+                        book_key = hash(book) % ((sys.maxsize + 1) * 2)
+
+                        cur = self.db.execute(QUERY_BOOK_FMT % book_key)
+                        row = cur.fetchone()
+
+                        if row is None:
+                            self.db.execute(BOOK_INSERT_FMT %
+                                            (book_key, book),
+                                            False)
+                            books_added += 1
+                            print('New book detected: %s, key: %d' %
+                                  (book, book_key))
+                            if book.startswith(boms[0]):
+                                print('BOM....')
+                                return 1
+                            pass
+
+                        cur = self.db.execute(QUERY_CLIP_FMT % (clip_key))
+                        row = cur.fetchone()
+
+                        if row is None:
+                            self.db.execute(CLIP_INSERT_FMT %
+                                            (clip_key, book_key, page, time, mark),
+                                            False)
+                            records_added += 1
+
         wx.MessageBox("Hello again from wxPython")
 
     def OnAbout(self, event):
