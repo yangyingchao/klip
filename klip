@@ -38,8 +38,17 @@ def getDBPath(readonly=False):
     return path
 
 
+def myhash(value):
+    """
+
+    Arguments:
+    - `value`:
+    """
+    return hash(value) % ((sys.maxsize + 1) * 2)
+
+
 boms = [codecs.BOM_UTF8]
-reps = [('（', '('), ('）', ')'), ('（', '('), ('）',')')]
+reps = [('（', '('), ('）', ')'), ('（', '('), ('）', ')')]
 r_match_book = re.compile('(.*?)\(.*?\)', re.DOTALL)
 
 
@@ -104,11 +113,11 @@ BOOK_INSERT_FMT = 'insert into %s values ' % BOOK_TABLE + \
 QUERY_BOOK_FMT = "select id, book from %s where ID = " % BOOK_TABLE + "%u"
 
 
-class Database(object):
+class KlipModel(object):
     def __init__(self, readonly=False):
         """
         """
-        super(Database, self).__init__()
+        super(KlipModel, self).__init__()
         self.conn = sqlite3.connect(getDBPath(readonly))
         self.c = self.conn.cursor()
         self.execute(CLIP_CREATE, True)
@@ -136,6 +145,83 @@ class Database(object):
         """
         self.conn.commit()
         self.conn.close()
+        pass
+
+    def loadFile(self, path):
+        """Load clippings from file.
+
+        Arguments:
+
+        - `path`: path of file
+        """
+        books_added = 0
+        records_added = 0
+
+        with open(path) as fd:
+            while True:
+                content = fd.read(PAGE_SIZE)
+                if content is None:
+                    break
+                if len(content) == 0:
+                    break
+                pos = 0
+                while True:
+                    m = R_MATCH_ENTRY.search(content, pos)
+                    if m is None:
+                        new_content = fd.read(PAGE_SIZE)
+                        if len(new_content) == 0:
+                            print('New books: %d, new records: %d' %
+                                  (books_added, records_added))
+                            print('EOF reached...')
+                            return (books_added, records_added)
+                        else:
+                            content = content[pos:] + new_content
+                            pos = 0
+                    else:
+                        book = handleStr(process_book_name(m.group(1)))
+                        page = handleStr(m.group(2).strip())
+                        time = handleStr(m.group(3).strip())
+                        mark = handleStr(m.group(4).strip())
+                        pos = m.end(0)
+
+                        if len(mark) == 0:
+                            continue
+
+                        value = book + "_" + mark
+
+                        clip_key = myhash(value)
+                        book_key = myhash(book)
+
+                        cur = self.execute(QUERY_BOOK_FMT % book_key)
+                        row = cur.fetchone()
+
+                        if row is None:
+                            self.execute(BOOK_INSERT_FMT %
+                                         (book_key, book),
+                                         False)
+                            books_added += 1
+                            print('New book detected: %s, key: %d' %
+                                  (book, book_key))
+                            if book.startswith(boms[0]):
+                                print('BOM....')
+                                return 1
+                            pass
+
+                        cur = self.execute(
+                            QUERY_CLIP_FROM_ID % (clip_key))
+                        row = cur.fetchone()
+
+                        if row is None:
+                            self.execute(CLIP_INSERT_FMT %
+                                         (clip_key, book, page, time, mark),
+                                         False)
+                            records_added += 1
+
+        pass
+
+    def cleanup(self):
+        """ Clean up model and database.
+        """
         pass
 
 
@@ -177,7 +263,7 @@ class KlipFrame(wx.Frame):
         super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760))
         # ensure the parent's __init__ is called
 
-        self.db = Database()
+        self.model = KlipModel()
         self.SetMinSize(wx.Size(800, 600))
 
         sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
@@ -197,8 +283,8 @@ class KlipFrame(wx.Frame):
                   0, wx.EXPAND, 0)
 
         self.book_list = BookListCtrl(pnl_books,
-                                     wx.ID_ANY,
-                                      style=wx.LC_REPORT | wx.LC_NO_HEADER|
+                                      wx.ID_ANY,
+                                      style=wx.LC_REPORT | wx.LC_NO_HEADER |
                                       wx.LC_HRULES | wx.LC_SINGLE_SEL)
         books = self.FillBooks()
 
@@ -211,8 +297,8 @@ class KlipFrame(wx.Frame):
         self.Bind(wx.EVT_LIST_ITEM_SELECTED,
                   self.OnBookSelected, self.book_list)
 
-
-        st2 = wx.StaticText(pnl_books, label="BOOKS (%d)"%books, pos=(25, 25))
+        st2 = wx.StaticText(pnl_books, label="BOOKS (%d)" %
+                            books, pos=(25, 25))
 
         sizer.Add(st2, 0, wx.LEFT, 0)
 
@@ -221,7 +307,7 @@ class KlipFrame(wx.Frame):
         # pnl_books.SetAutoLayout(True)
         pnl_books.SetSizer(sizer)
 
-        ### init right panel, show clippings.
+        # init right panel, show clippings.
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.book_title = wx.StaticText(
             pnl_clips, label='')
@@ -246,9 +332,8 @@ class KlipFrame(wx.Frame):
         pnl_clips.SetSizer(sizer)
 
         font = self.clip_list.GetFont()
-        font.PointSize += 5
+        font.PointSize += 3
         self.clip_list.SetFont(font)
-
 
         # create a menu bar
         self.makeMenuBar()
@@ -303,73 +388,12 @@ class KlipFrame(wx.Frame):
     def OnLoadFile(self, event):
         """Say hello to the user."""
 
-        books_added = 0
-        records_added = 0
-
         path = getClipPath()
         if not os.path.exists(path):
             path = "/Volumes/yyc/Documents/My Clippings.txt"
 
-        with open(path) as fd:
-            while True:
-                content = fd.read(PAGE_SIZE)
-                if content is None:
-                    break
-                if len(content) == 0:
-                    break
-                pos = 0
-                while True:
-                    m = R_MATCH_ENTRY.search(content, pos)
-                    if m is None:
-                        new_content = fd.read(PAGE_SIZE)
-                        if len(new_content) == 0:
-                            print('New books: %d, new records: %d' %
-                                  (books_added, records_added))
-                            print('EOF reached...')
-                            self.FillBooks()
-                            return
-                        else:
-                            content = content[pos:] + new_content
-                            pos = 0
-                    else:
-                        book = handleStr(process_book_name(m.group(1)))
-                        page = handleStr(m.group(2).strip())
-                        time = handleStr(m.group(3).strip())
-                        mark = handleStr(m.group(4).strip())
-                        pos = m.end(0)
-
-                        if len(mark) == 0:
-                            continue
-
-                        value = book + "_" + mark
-
-                        clip_key = hash(value) % ((sys.maxsize + 1) * 2)
-                        book_key = hash(book) % ((sys.maxsize + 1) * 2)
-
-                        cur = self.db.execute(QUERY_BOOK_FMT % book_key)
-                        row = cur.fetchone()
-
-                        if row is None:
-                            self.db.execute(BOOK_INSERT_FMT %
-                                            (book_key, book),
-                                            False)
-                            books_added += 1
-                            print('New book detected: %s, key: %d' %
-                                  (book, book_key))
-                            if book.startswith(boms[0]):
-                                print('BOM....')
-                                return 1
-                            pass
-
-                        cur = self.db.execute(QUERY_CLIP_FROM_ID % (clip_key))
-                        row = cur.fetchone()
-
-                        if row is None:
-                            self.db.execute(CLIP_INSERT_FMT %
-                                            (clip_key, book, page, time, mark),
-                                            False)
-                            records_added += 1
-
+        self.model.loadFile(path)
+        self.FillBooks()
         wx.MessageBox("Hello again from wxPython")
 
     def OnAbout(self, event):
@@ -385,11 +409,10 @@ class KlipFrame(wx.Frame):
         self.book_list.ClearAll()
         self.book_list.SetBackgroundColour(wx.Colour(0xf6, 0xf6, 0xf6))
 
-
         self.book_list.InsertColumn(0, "Book")
         # 0 will insert at the start of the list
 
-        cur = self.db.execute('select book from %s' % BOOK_TABLE)
+        cur = self.model.execute('select book from %s' % BOOK_TABLE)
         idx = 0
 
         while True:
@@ -400,7 +423,7 @@ class KlipFrame(wx.Frame):
             self.book_list.InsertStringItem(idx, u"   %s" % (book))
             idx += 1
 
-        width = self.book_list.GetSize().GetWidth()*0.5;
+        width = self.book_list.GetSize().GetWidth()*0.5
         print('WIDTH: %d' % (width))
         self.book_list.SetColumnWidth(0, width)
         # self.book_list.SetFont(wx.Font(32, wx.FONTFAMILY_MODERN,
@@ -414,20 +437,20 @@ class KlipFrame(wx.Frame):
         currentItem = event.m_itemIndex
         book = self.book_list.GetItemText(currentItem).strip()
 
-        self.book_title.SetLabel("  %s"%book)
+        self.book_title.SetLabel("  %s" % book)
         self.clip_list.ClearAll()
         self.clip_list.InsertColumn(0, "Clip")
 
-        sql = QUERY_CLIP_FROM_BOOK%book
-        cur = self.db.execute(sql)
+        sql = QUERY_CLIP_FROM_BOOK % book
+        cur = self.model.execute(sql)
         idx = 0
         while True:
-            r  = cur.fetchone()
+            r = cur.fetchone()
             if r is None:
                 break
 
             clip = r[0]
-            self.clip_list.InsertStringItem(idx, u"    %s"%(clip))
+            self.clip_list.InsertStringItem(idx, u"    %s" % (clip))
             idx += 1
 
         self.clip_list.SetColumnWidth(0, -2)
