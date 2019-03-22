@@ -66,7 +66,7 @@ def process_book_name(name):
         if name.startswith(bom):
             name = name[len(bom):]
 
-    return name
+    return name.strip()
 
 
 R_MATCH_ENTRY = re.compile(
@@ -88,7 +88,8 @@ create table if not exists %s
 CLIP_INSERT_FMT = 'insert into %s values ' % CLIP_TABLE + \
     '''(%u, '%s', '%s', '%s', '%s');'''
 
-QUERY_CLIP_FMT = "select id, book from %s where ID = " % CLIP_TABLE + "%u"
+QUERY_CLIP_FROM_ID = "select id, book from %s where ID = " % CLIP_TABLE + "%u"
+QUERY_CLIP_FROM_BOOK = u"select content from %s where BOOK = " % CLIP_TABLE + "'%s'"
 
 BOOK_TABLE = 'books'
 BOOK_CREATE = '''
@@ -173,7 +174,7 @@ class KlipFrame(wx.Frame):
         """
         """
 
-        super(KlipFrame, self).__init__(None, size=wx.Size(800, 600))
+        super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760))
         # ensure the parent's __init__ is called
 
         self.db = Database()
@@ -201,6 +202,16 @@ class KlipFrame(wx.Frame):
                                       wx.LC_HRULES | wx.LC_SINGLE_SEL)
         books = self.FillBooks()
 
+        font = self.book_list.GetFont()
+        font.PointSize += 5
+        # font = font.Bold()
+        self.book_list.SetFont(font)
+        self.book_list.SetForegroundColour(wx.Colour(0x43, 0x43, 0x43))
+
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED,
+                  self.OnBookSelected, self.book_list)
+
+
         st2 = wx.StaticText(pnl_books, label="BOOKS (%d)"%books, pos=(25, 25))
 
         sizer.Add(st2, 0, wx.LEFT, 0)
@@ -210,14 +221,40 @@ class KlipFrame(wx.Frame):
         # pnl_books.SetAutoLayout(True)
         pnl_books.SetSizer(sizer)
 
-        st2 = wx.StaticText(pnl_clips, label="Hello World2!", pos=(25, 25))
-        font = st2.GetFont()
-        font.PointSize += 10
-        font = font.Bold()
-        st2.SetFont(font)
+        ### init right panel, show clippings.
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.book_title = wx.StaticText(
+            pnl_clips, label='')
 
-        # # create a menu bar
-        # self.makeMenuBar()
+        font = self.book_title.GetFont()
+        font.PointSize += 10
+        font.Bold()
+        self.book_title.SetFont(font)
+        self.book_title.SetForegroundColour(wx.Colour(0x25, 0x91, 0xff))
+
+        sizer.Add(self.book_title,
+                  0, wx.EXPAND, 0)
+
+        self.clip_list = BookListCtrl(pnl_clips,
+                                      wx.ID_ANY,
+                                      style=wx.LC_REPORT | wx.LC_NO_HEADER |
+                                      wx.LC_HRULES | wx.LC_SINGLE_SEL)
+        books = self.FillBooks()
+
+        sizer.Add(self.clip_list, 1, wx.EXPAND | wx.ALL, 0)
+
+        pnl_clips.SetSizer(sizer)
+
+        font = self.clip_list.GetFont()
+        font.PointSize += 5
+        self.clip_list.SetFont(font)
+
+
+        # create a menu bar
+        self.makeMenuBar()
+
+        if books > 0:
+            self.book_list.Select(0)
 
     def makeMenuBar(self):
         """
@@ -289,6 +326,7 @@ class KlipFrame(wx.Frame):
                             print('New books: %d, new records: %d' %
                                   (books_added, records_added))
                             print('EOF reached...')
+                            self.FillBooks()
                             return
                         else:
                             content = content[pos:] + new_content
@@ -323,7 +361,7 @@ class KlipFrame(wx.Frame):
                                 return 1
                             pass
 
-                        cur = self.db.execute(QUERY_CLIP_FMT % (clip_key))
+                        cur = self.db.execute(QUERY_CLIP_FROM_ID % (clip_key))
                         row = cur.fetchone()
 
                         if row is None:
@@ -368,13 +406,33 @@ class KlipFrame(wx.Frame):
         # self.book_list.SetFont(wx.Font(32, wx.FONTFAMILY_MODERN,
         #                                wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
 
-        font = self.book_list.GetFont()
-        font.PointSize += 5
-        # font = font.Bold()
-        self.book_list.SetFont(font)
-        self.book_list.SetForegroundColour(wx.Colour(0x43, 0x43, 0x43))
-        self.book_list.Show(True)
         return idx
+
+    def OnBookSelected(self, event):
+        """
+        """
+        currentItem = event.m_itemIndex
+        book = self.book_list.GetItemText(currentItem).strip()
+
+        self.book_title.SetLabel("  %s"%book)
+        self.clip_list.ClearAll()
+        self.clip_list.InsertColumn(0, "Clip")
+
+        sql = QUERY_CLIP_FROM_BOOK%book
+        cur = self.db.execute(sql)
+        idx = 0
+        while True:
+            r  = cur.fetchone()
+            if r is None:
+                break
+
+            clip = r[0]
+            self.clip_list.InsertStringItem(idx, u"    %s"%(clip))
+            idx += 1
+
+        self.clip_list.SetColumnWidth(0, -2)
+
+        pass
 
 
 if __name__ == '__main__':
