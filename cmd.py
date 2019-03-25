@@ -6,7 +6,8 @@ import traceback
 from common import getClipPath
 
 controller = None
-stop=False
+stop = False
+
 
 def loadFile(args):
     """Load clippings from args[0]
@@ -45,31 +46,25 @@ def showBooks():
     print('Showing books:')
     counter = 0
     iter = controller.getBooks()
-    while True:
-        (id, book) = iter.next()
-        if id:
-            print('    [%d] -- %s'%(id, book))
-            counter += 1
-        else:
-            break
+    while iter.next():
+        counter += 1
+        print('    [%d] -- %s' % (counter, iter.book))
 
-    print('\nTotal books: %d'%(counter))
+    print('\nTotal books: %d' % (counter))
     pass
+
 
 def showClips(book=None):
     print('Showing clips:')
-    counter = 0
     iter = controller.getClips(book)
-    while True:
-        (id, book, clip) = iter.next()
-        if id:
-            print('    [%d] -- %s -- %s'%(id, book, clip))
-            counter += 1
-        else:
-            break
+    idx = 1
+    while iter.next():
+        idx += 1
+        print('    [%d] -- %s -- %s' % (idx, iter.book, iter.content))
 
-    print('\nTotal books: %d'%(counter))
+    print('\nTotal books: %d' % (idx))
     pass
+
 
 def showFunc(args):
 
@@ -85,16 +80,26 @@ def showFunc(args):
         else:
             raise Exception("not implemented: %s" % target)
     else:
-        showBooks();
+        showBooks()
 
     pass
+
+
+def cleanUp(books=None):
+    if books:
+        for book in books:
+            controller.cleanUpBook(book)
+    else:
+        controller.cleanUpBooks()
+
 
 handlers = {
     "load": loadFile,
     "/h": showHelp,
-    "exit":exitFunc,
-    "quit":exitFunc,
-    "show":showFunc,
+    "exit": exitFunc,
+    "quit": exitFunc,
+    "show": showFunc,
+    "clean": cleanUp,
 }
 
 
@@ -115,14 +120,14 @@ def startCMD(controller_):
             args = array[1:] if l > 1 else None
             handler = handlers.get(cmd, None)
             if handler is None:
-                print('CMD: %s not implemented'%(cmd))
+                print('CMD: %s not implemented' % (cmd))
                 continue
 
             handler(args)
         except Exception as e:
-            print ('str(Exception):\t %s' % str(Exception)                  )
-            print ('str(e):\t\t%s'% str(e)                                 )
-            print ('repr(e):\t%s'% repr(e)                                 )
-            print ('traceback.print_exc():%s'% traceback.print_exc()       )
-            print ('traceback.format_exc():\n%s' % traceback.format_exc())
+            print('str(Exception):\t %s' % str(Exception))
+            print('str(e):\t\t%s' % str(e))
+            print('repr(e):\t%s' % repr(e))
+            print('traceback.print_exc():%s' % traceback.print_exc())
+            print('traceback.format_exc():\n%s' % traceback.format_exc())
     pass

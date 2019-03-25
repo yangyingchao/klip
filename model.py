@@ -3,7 +3,7 @@
 import sys
 import os
 import sqlite3
-from common import myhash
+from common import myhash, PDEBUG
 
 
 def getDBPath(readonly=False):
@@ -63,14 +63,19 @@ class BookIter(object):
     def __init__(self, cursor):
         self._cursor = cursor
         super(BookIter, self).__init__()
+        self.id = None
+        self.book = None
 
     def next(self):
         """Return next book of format (ID, NAME), or None if no books
         """
         res = self._cursor.fetchone()
         if res:
-            return (res[0], res[1])
-        return (None, None)
+            self.id = res[0]
+            self.book = res[1]
+            return True
+
+        return False
 
 
 class ClipIter(object):
@@ -80,14 +85,23 @@ class ClipIter(object):
     def __init__(self, cursor):
         self._cursor = cursor
         super(ClipIter, self).__init__()
+        self.id = None
+        self.book = None
+        self.pos = None
+        self.content = None
 
     def next(self):
         """Return next book of format (ID, NAME), or None if no books
         """
         res = self._cursor.fetchone()
         if res:
-            return (res[0], res[1], res[2])
-        return (None, None, None)
+            self.id = res[0]
+            self.book = res[1]
+            self.pos = res[2]
+            self.content = res[3]
+            return True
+
+        return False
 
 
 class KlipModel(object):
@@ -126,7 +140,7 @@ class KlipModel(object):
     def getBooks(self):
         """Return iterator of books.
         """
-        cur = self.execute('''select ID, NAME from books;''')
+        cur = self.conn.execute('''select ID, NAME from books;''')
         return BookIter(cur)
 
     def cleanup(self):
@@ -174,9 +188,23 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
         return (new_book, new_clip)
 
     def getClips(self, book):
-        sql='''select id, book, content from clippings'''
+        sql='''select id, book, pos, content from clippings'''
         if book is not None:
             sql += ''' where book = '%s'  ''' % book
 
-        cursor = self.execute(sql)
+        cursor = self.conn.execute(sql)
         return ClipIter(cursor)
+
+    def cleanClipsById(self, ids):
+        if ids is None or len(ids) == 0:
+            return
+
+        PDEBUG('ids: %s', ids)
+        id_strs = []
+        for id in ids:
+            id_strs.append("%d"%id)
+
+        sql = '''delete from clippings where id in (%s)''' % ", ".join(id_strs)
+
+        self.execute(sql, True)
+        pass

@@ -5,7 +5,7 @@ import re
 import sys
 import codecs
 
-from common import myhash, PDEBUG
+from common import PDEBUG
 
 
 PAGE_SIZE = 4096
@@ -140,7 +140,6 @@ class KlipController(object):
         print('Total books added: %d, clips added:%d'%(books_added, records_added))
         return (books_added, records_added)
 
-
     def getBooks(self):
         """
         """
@@ -151,4 +150,49 @@ class KlipController(object):
         """
         """
         return self.model.getClips(book)
+        pass
+
+    def cleanUpBooks(self):
+        """
+        """
+        iter = self.getBooks()
+        while iter.next():
+            self.cleanUpBook(iter.book)
+
+    def cleanUpBook(self, book):
+        """
+        """
+        PDEBUG('Cleaning book: %s', book)
+        clips = {}  # pos - (id, content)
+        dup_id = []
+
+        iter = self.model.getClips(book)
+        while iter.next():
+            id = iter.id
+            pos = iter.pos
+            content = iter.content.strip(u' "“')
+            if iter.pos in clips:
+                old = clips[pos]
+                old_id = old[0]
+                old_content = old[1]
+
+                PDEBUG('POS: %d -- %d\nOLD: %s\nNEW:%s', pos, iter.pos,
+                       old_content, content)
+
+                if old_content.startswith(content):
+                    # existing one should be replaced with new one
+                    dup_id.append(old_id)
+                    clips[pos] = (id, content)
+                    continue
+                elif content.startswith(old_content): # new one should be dropped..
+                    dup_id.append(id)
+                    continue
+
+            clips[iter.pos] = (id, content)
+
+        if dup_id:
+            self.model.cleanClipsById(dup_id)
+
+
+
         pass
