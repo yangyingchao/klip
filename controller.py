@@ -176,15 +176,20 @@ class KlipController(object):
                 old_id = old[0]
                 old_content = old[1]
 
-                PDEBUG('POS: %d -- %d\nOLD: %s\nNEW:%s', pos, iter.pos,
+                PDEBUG('POS: %d -- %d\nOLD: [%d]%s\n[%d]NEW:%s', pos,
+                       old_id,
+                       iter.pos, id,
                        old_content, content)
 
-                if old_content.startswith(content):
+                if old_content.startswith(content) or \
+                   content.endswith(old_content):
                     # existing one should be replaced with new one
                     dup_id.append(old_id)
                     clips[pos] = (id, content)
                     continue
-                elif content.startswith(old_content): # new one should be dropped..
+                elif content.startswith(old_content) or \
+                     old_content.endswith(content):
+                    # new one should be dropped..
                     dup_id.append(id)
                     continue
 

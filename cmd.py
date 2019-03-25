@@ -48,7 +48,7 @@ def showBooks():
     iter = controller.getBooks()
     while iter.next():
         counter += 1
-        print('    [%d] -- %s' % (counter, iter.book))
+        print('    [%d] -- %s' % (iter.id, iter.book))
 
     print('\nTotal books: %d' % (counter))
     pass
@@ -60,7 +60,7 @@ def showClips(book=None):
     idx = 1
     while iter.next():
         idx += 1
-        print('    [%d] -- %s -- %s' % (idx, iter.book, iter.content))
+        print('    [%d] -- %s -- %s' % (iter.id, iter.book, iter.content))
 
     print('\nTotal books: %d' % (idx))
     pass
