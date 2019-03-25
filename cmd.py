@@ -62,7 +62,7 @@ def showClips(book=None):
         idx += 1
         print('    [%d] -- %s -- %s' % (iter.id, iter.book, iter.content))
 
-    print('\nTotal books: %d' % (idx))
+    print('\nTotal clippings: %d' % (idx))
     pass
 
 

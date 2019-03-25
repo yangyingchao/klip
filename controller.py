@@ -45,9 +45,6 @@ def process_book_name(name):
     Arguments:
     - `name`:
     """
-
-    PDEBUG('Processing book: %s', name)
-
     # replace some  charachters.
     for (k, v) in reps:
         name = name.replace(k, v)
@@ -88,6 +85,7 @@ class KlipController(object):
         """
         books_added = 0
         records_added = 0
+        books_to_clean = set()
 
         with open(path) as fd:
             while True:
@@ -135,9 +133,15 @@ class KlipController(object):
                             books_added += 1
 
                         if new_clip:
+                            books_to_clean.add(book)
                             records_added += 1
 
-        print('Total books added: %d, clips added:%d'%(books_added, records_added))
+        for book in books_to_clean:
+            self.cleanUpBook(book)
+
+        print('Total books added: %d, clips added:%d' %
+              (books_added, records_added))
+
         return (books_added, records_added)
 
     def getBooks(self):
@@ -149,7 +153,7 @@ class KlipController(object):
     def getClips(self, book):
         """
         """
-        return self.model.getClips(book)
+        return self.model.getClipsByName(book)
         pass
 
     def cleanUpBooks(self):
@@ -166,7 +170,7 @@ class KlipController(object):
         clips = {}  # pos - (id, content)
         dup_id = []
 
-        iter = self.model.getClips(book)
+        iter = self.model.getClipsByName(book)
         while iter.next():
             id = iter.id
             pos = iter.pos

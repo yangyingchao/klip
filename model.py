@@ -187,8 +187,8 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
 
         return (new_book, new_clip)
 
-    def getClips(self, book):
-        sql='''select id, book, pos, content from clippings'''
+    def getClipsByName(self, book):
+        sql = '''select id, book, pos, content from clippings'''
         if book is not None:
             sql += ''' where book = '%s'  ''' % book
 
@@ -202,7 +202,7 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
         PDEBUG('ids: %s', ids)
         id_strs = []
         for id in ids:
-            id_strs.append("%d"%id)
+            id_strs.append("%d" % id)
 
         sql = '''delete from clippings where id in (%s)''' % ", ".join(id_strs)
 
