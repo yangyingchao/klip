@@ -5,7 +5,7 @@ import sys
 import traceback
 from common import getClipPath
 
-controller = None
+model = None
 stop = False
 
 
@@ -20,7 +20,7 @@ def loadFile(args):
     else:
         path = getClipPath()
 
-    controller.loadFile(path)
+    model.loadFile(path)
     pass
 
 
@@ -45,7 +45,7 @@ def exitFunc(args):
 def showBooks():
     print('Showing books:')
     counter = 0
-    iter = controller.getBooks()
+    iter = model.getBooks()
     while iter.next():
         counter += 1
         print('    [%d] -- %s' % (iter.id, iter.book))
@@ -56,7 +56,7 @@ def showBooks():
 
 def showClips(book=None):
     print('Showing clips:')
-    iter = controller.getClips(book)
+    iter = model.getClipsByName(book)
     idx = 1
     while iter.next():
         idx += 1
@@ -88,9 +88,9 @@ def showFunc(args):
 def cleanUp(books=None):
     if books:
         for book in books:
-            controller.cleanUpBook(book)
+            model.cleanUpBook(book)
     else:
-        controller.cleanUpBooks()
+        model.cleanUpBooks()
 
 
 handlers = {
@@ -103,9 +103,9 @@ handlers = {
 }
 
 
-def startCMD(controller_):
-    global controller
-    controller = controller_
+def startCMD(model_):
+    global model
+    model = model_
     print('Input your commands here, type "/h" for help.. ')
     while not stop:
         try:
