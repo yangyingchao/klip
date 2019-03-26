@@ -46,6 +46,14 @@ def process_book_name(name):
     Arguments:
     - `name`:
     """
+
+    name = name.strip()
+    # remove BOMs first
+    bts = name.encode()
+    if bts[0:3] == codecs.BOM_UTF8:
+        name = bytes.decode(bts[3:])
+        bts = name.encode()
+
     # replace some  charachters.
     for (k, v) in reps:
         name = name.replace(k, v)
@@ -56,11 +64,6 @@ def process_book_name(name):
     m = r_match_book.match(name)
     if m:
         name = m.group(1)
-
-        # remove BOMs first
-    for bom in boms:
-        if name.startswith(str(bom)):
-            name = name[len(bom):]
 
     return name.strip()
 
@@ -88,7 +91,7 @@ CLIP_TABLE = 'clippings'
 CLIP_CREATE = '''
 create table if not exists %s
     (
-      ID INTEGER PRIMARY KEY AUTOINCREMENT,
+      ID INTEGER PRIMARY KEY  AUTOINCREMENT,
       BOOK TEXT,
       POS INTEGER,
       TIMESTAMP TEXT,
@@ -260,6 +263,7 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
         books_added = 0
         records_added = 0
         books_to_clean = set()
+        tmp_fd = open('/tmp/tmp_write.txt', 'w')
 
         with open(path) as fd:
             while True:
@@ -287,6 +291,16 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
                         time = handleStr(m.group(3).strip())
                         mark = handleStr(m.group(4).strip())
                         pos = m.end(0)
+
+                        tmp_fd.write(book + "\n")
+
+                        bts=book.encode()
+                        if bts[0:3] == codecs.BOM_UTF8:
+                            PDEBUG('oops: ')
+                            PDEBUG('%X-%X-%X', bts[0], bts[1], bts[2])
+
+                            sys.exit()
+
 
                         if len(mark) == 0:
                             continue

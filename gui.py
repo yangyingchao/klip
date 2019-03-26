@@ -176,7 +176,6 @@ class KlipFrame(wx.Frame):
             idx += 1
 
         width = self.book_list.GetSize().GetWidth()*0.5
-        print('WIDTH: %d' % (width))
         self.book_list.SetColumnWidth(0, width)
         # self.book_list.SetFont(wx.Font(32, wx.FONTFAMILY_MODERN,
         #                                wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
