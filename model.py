@@ -140,6 +140,15 @@ class BookIter(object):
         return False
 
 
+class Clip(object):
+    def __init__(self, pos, date, content):
+        super(Clip, self).__init__()
+        self.pos = pos
+        self.date = date
+        self.content = content
+
+
+
 class ClipIter(object):
     """
     """
@@ -394,3 +403,11 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
 
         cursor = self.conn.execute(sql)
         return ClipIter(cursor)
+
+    def getClipById(self, id):
+        sql = '''select pos, timestamp, content from clippings where id = %d
+''' %id
+
+        cursor = self.conn.execute(sql)
+        r = cursor.fetchone()
+        return Clip(r[0], r[1], r[2])

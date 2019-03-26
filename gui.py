@@ -3,7 +3,7 @@
 
 import wx
 import wx.lib.mixins.listctrl as listmix
-from common import getClipPath
+from common import getClipPath, PDEBUG
 
 
 class KlipListCtrl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
@@ -12,6 +12,68 @@ class KlipListCtrl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
         wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
         listmix.ListCtrlAutoWidthMixin.__init__(self)
 
+
+class KlipDetailWindow(wx.PopupWindow):
+    """Adds a bit of text and mouse movement to the wx.PopupWindow"""
+
+    def __init__(self, parent, style):
+        wx.PopupWindow.__init__(self, parent, style)
+        pnl = self.pnl = wx.Panel(self)
+        pnl.SetBackgroundColour("CADET BLUE")
+
+        self.st = wx.StaticText(pnl, -1,
+                           "This is a special kind of top level\n"
+                           "window that can be used for\n"
+                           "popup menus, combobox popups\n"
+                           "and such.\n\n"
+                           "Try positioning the demo near\n"
+                           "the bottom of the screen and \n"
+                           "hit the button again.\n\n"
+                           "In this demo this window can\n"
+                           "be dragged with the left button\n"
+                           "and closed with the right.",
+                           pos=(10, 10))
+
+        sz = self.st.GetBestSize()
+        self.SetSize((sz.width+20, sz.height+20))
+        pnl.SetSize((sz.width+20, sz.height+20))
+
+        pnl.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
+        pnl.Bind(wx.EVT_MOTION, self.OnMouseMotion)
+        pnl.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
+        pnl.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
+
+        self.st.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
+        self.st.Bind(wx.EVT_MOTION, self.OnMouseMotion)
+        self.st.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
+        self.st.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
+
+        wx.CallAfter(self.Refresh)
+
+    def OnMouseLeftDown(self, evt):
+        self.Refresh()
+        self.ldPos = evt.GetEventObject().ClientToScreen(evt.GetPosition())
+        self.wPos = self.ClientToScreen((0, 0))
+        self.pnl.CaptureMouse()
+
+    def OnMouseMotion(self, evt):
+        if evt.Dragging() and evt.LeftIsDown():
+            dPos = evt.GetEventObject().ClientToScreen(evt.GetPosition())
+            nPos = (self.wPos.x + (dPos.x - self.ldPos.x),
+                    self.wPos.y + (dPos.y - self.ldPos.y))
+            self.Move(nPos)
+
+    def OnMouseLeftUp(self, evt):
+        if self.pnl.HasCapture():
+            self.pnl.ReleaseMouse()
+
+    def OnRightUp(self, evt):
+        self.Show(False)
+        wx.CallAfter(self.Destroy)
+
+    def UpdateContent(self, content, date, pos):
+        PDEBUG('POS: %d, DATE: %s', pos, date)
+        self.st.SetLabel(content)
 
 class KlipFrame(wx.Frame):
     """
@@ -25,6 +87,7 @@ class KlipFrame(wx.Frame):
         super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760))
         # ensure the parent's __init__ is called
 
+        self.detailPanel = KlipDetailWindow(self, wx.SIMPLE_BORDER)
         self.SetMinSize(wx.Size(800, 600))
 
         sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
@@ -89,6 +152,9 @@ class KlipFrame(wx.Frame):
         books = self.FillBooks()
 
         sizer.Add(self.clip_list, 1, wx.EXPAND | wx.ALL, 0)
+
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED,
+                  self.OnClipActivated, self.clip_list)
 
         pnl_clips.SetSizer(sizer)
 
@@ -194,10 +260,27 @@ class KlipFrame(wx.Frame):
         iter = self.model.getClipsByName(book)
         idx = 0
         while iter.next():
-            self.clip_list.InsertItem(idx, u"    %s" % (iter.content))
+            item = wx.ListItem()
+            item.SetData(iter.id)
+            item.SetId(idx)
+            item.SetText(u"    %s" % (iter.content))
+            self.clip_list.InsertItem(item)
+
+            # item = self.clip_list.InsertItem(idx, u"    %s" % (iter.content))
             idx += 1
 
         self.clip_list.SetColumnWidth(0, -2)
+        pass
+
+    def OnClipActivated(self, event):
+
+        item = event.GetItem()
+        id = item.GetData()
+        txt = item.GetText()
+        PDEBUG('ID: %d -- %s', id, txt)
+        clip = self.model.getClipById(id)
+        self.detailPanel.UpdateContent(clip.content, clip.date, clip.pos)
+        self.detailPanel.Show(True)
         pass
 
 def startGUI(controller):
