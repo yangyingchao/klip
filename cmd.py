@@ -10,10 +10,7 @@ stop = False
 
 
 def loadFile(args):
-    """Load clippings from args[0]
-
-    Arguments:
-    - `args`:
+    """Load clippings from file (if specified), or from default file.
     """
     if args and len(args) > 0:
         path = args[0]
@@ -25,17 +22,18 @@ def loadFile(args):
 
 
 def showHelp(args):
+    """  Show  help message.
     """
-    """
-    print('Not implemented...')
+    print('Show help message...\n')
+
+    for key in handlers.keys():
+        func = handlers[key]
+        print('    %s: %s' % (key, func.__doc__))
     pass
 
 
 def exitFunc(args):
-    """
-
-    Arguments:
-    - `args`:
+    """exit klip.
     """
     global stop
     stop = True
@@ -43,6 +41,8 @@ def exitFunc(args):
 
 
 def showBooks():
+    """ Show books.
+    """
     print('Showing books:')
     counter = 0
     iter = model.getBooks()
@@ -55,6 +55,8 @@ def showBooks():
 
 
 def showClips(book=None):
+    """ Show Clips from books.
+    """
     print('Showing clips:')
     iter = model.getClipsByName(book)
     idx = 1
@@ -67,7 +69,10 @@ def showClips(book=None):
 
 
 def showFunc(args):
-
+    """ Show books or clips.
+    eg, show books
+        show clips
+    """
     if args:
         target = args[0].lower()
         if target == "books":
@@ -85,19 +90,42 @@ def showFunc(args):
     pass
 
 
+def cleanupCallback(lst):
+    if lst:
+        print('Going to remove following items:\n')
+        idx = 1
+        for item in lst:
+            print('    [%d]: %s' % (idx, item))
+            idx += 1
+
+        print('\nContintue? Y/[N]')
+
+        line = sys.stdin.readline().lower().strip()
+        if len(line) == 0:
+            return True
+        if len(line) == 1 and line[0] == 'y':
+            return True
+        return False
+    return True
+
+
 def cleanUp(books=None):
+    """Clean clippings, by removing duplicated records.
+    """
     if books:
         for book in books:
-            model.cleanUpBook(book)
+            model.cleanUpBook(book, cleanupCallback)
     else:
-        model.cleanUpBooks()
+        model.cleanUpBooks(cleanupCallback)
 
 
 handlers = {
     "load": loadFile,
+    "help": showHelp,
     "/h": showHelp,
     "exit": exitFunc,
     "quit": exitFunc,
+    "q": exitFunc,
     "show": showFunc,
     "clean": cleanUp,
 }

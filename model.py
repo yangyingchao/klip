@@ -3,9 +3,8 @@
 import sys
 import os
 import sqlite3
-from common import myhash, PDEBUG
+from common import PDEBUG
 import re
-import sys
 import codecs
 
 
@@ -141,12 +140,12 @@ class BookIter(object):
 
 
 class Clip(object):
-    def __init__(self, pos, date, content):
+    def __init__(self, book, pos, date, content):
         super(Clip, self).__init__()
+        self.book = book
         self.pos = pos
         self.date = date
         self.content = content
-
 
 
 class ClipIter(object):
@@ -184,6 +183,8 @@ class KlipModel(object):
         self.c = self.conn.cursor()
         self.__execute__(CLIP_CREATE, True)
         self.__execute__(BOOK_CREATE, True)
+        self.__execute__('''create table  if not exists blacklist as
+select * from clippings limit 0''', True)
 
     def __execute__(self, sql, commit=True):
         """
@@ -232,18 +233,28 @@ class KlipModel(object):
             new_book = False
 
         cur = self.__execute__('''
-select id from clippings where book = '%s' and content = '%s'
+select id from blacklist where book = '%s' and content = '%s'
 ''' % (book, clip))
 
         row = cur.fetchone()
 
-        if row is None:
-            self.__execute__('''
-insert into clippings values (NULL, '%s', %u, '%s', '%s')
-''' % (book, pos, date, clip), False)
-            new_clip = True
-        else:
+        if row is not None:
+            # item is in blacklist, means similar content exists...
             new_clip = False
+        else:
+            cur = self.__execute__('''
+    select id from clippings where book = '%s' and content = '%s'
+    ''' % (book, clip))
+
+            row = cur.fetchone()
+
+            if row is None:
+                self.__execute__('''
+    insert into clippings values (NULL, '%s', %u, '%s', '%s')
+    ''' % (book, pos, date, clip), False)
+                new_clip = True
+            else:
+                new_clip = False
 
         return (new_book, new_clip)
 
@@ -256,6 +267,9 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
         id_strs = []
         for id in ids:
             id_strs.append("%d" % id)
+
+        sql = '''insert into blacklist select * from clippings where id in (%s)''' % ", ".join(id_strs)
+        self.__execute__(sql, False)
 
         sql = '''delete from clippings where id in (%s)''' % ", ".join(id_strs)
 
@@ -341,15 +355,14 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
 
         return (books_added, records_added)
 
-
-    def cleanUpBooks(self):
+    def cleanUpBooks(self, callback=None):
         """
         """
         iter = self.getBooks()
         while iter.next():
-            self.cleanUpBook(iter.book)
+            self.cleanUpBook(iter.book, callback)
 
-    def cleanUpBook(self, book):
+    def cleanUpBook(self, book, callback=None):
         """
         """
         PDEBUG('Cleaning book: %s', book)
@@ -386,7 +399,17 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
             clips[iter.pos] = (id, content)
 
         if dup_id:
-            self.__cleanClipsById__(dup_id)
+            do_remove = True
+            if callback:
+                to_be_remove = []
+                for id in dup_id:
+                    clip = self.getClipById(id)
+                    to_be_remove.append('%s -- %s' % (clip.book, clip.content))
+
+                do_remove = callback(to_be_remove)
+
+            if do_remove:
+                self.__cleanClipsById__(dup_id)
 
         pass
 
@@ -405,9 +428,10 @@ insert into clippings values (NULL, '%s', %u, '%s', '%s')
         return ClipIter(cursor)
 
     def getClipById(self, id):
-        sql = '''select pos, timestamp, content from clippings where id = %d
-''' %id
+        sql = '''
+select book, pos, timestamp, content from clippings where id = %d
+''' % id
 
         cursor = self.conn.execute(sql)
         r = cursor.fetchone()
-        return Clip(r[0], r[1], r[2])
+        return Clip(r[0], r[1], r[2], r[3])
