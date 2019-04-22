@@ -13,8 +13,8 @@ PAGE_SIZE = 4096
 R_MATCH_ENTRY = re.compile(
     u'^(.*?)\n- (.*?) \\| (.*?)\n(.*?)\n==========', re.DOTALL | re.MULTILINE)
 
-R_MATCH_POS = re.compile(u'.*?位置 #(\d+).*')
-R_MATCH_PAGE = re.compile(u'.*?第 (\d+).*')
+R_MATCH_POS = re.compile(u'.*?位置 #(\d+(?:-\d+)?).*?的(标注|笔记)')
+R_MATCH_PAGE = re.compile(u'.*?第 (\d+).*?的(标注|笔记)')
 
 
 def handleStr(ins):
@@ -92,17 +92,12 @@ create table if not exists %s
     (
       ID INTEGER PRIMARY KEY  AUTOINCREMENT,
       BOOK TEXT,
-      POS INTEGER,
-      TIMESTAMP TEXT,
+      POS TEXT,
+TYPE TEXT,
+DATE TEXT,
       CONTENT TEXT
     );
 ''' % CLIP_TABLE
-
-CLIP_INSERT_FMT = 'insert into %s values ' % CLIP_TABLE + \
-    '''(%u, '%s', '%s', '%s', '%s');'''
-
-QUERY_CLIP_FROM_ID = "select id, book from %s where ID = " % CLIP_TABLE + "%u"
-QUERY_CLIP_FROM_BOOK = u"select content from %s where BOOK = " % CLIP_TABLE + "'%s'"
 
 BOOK_TABLE = 'books'
 BOOK_CREATE = '''
@@ -140,10 +135,11 @@ class BookIter(object):
 
 
 class Clip(object):
-    def __init__(self, book, pos, date, content):
+    def __init__(self, book, pos, typ, date, content):
         super(Clip, self).__init__()
         self.book = book
         self.pos = pos
+        self.typ = typ
         self.date = date
         self.content = content
 
@@ -209,7 +205,7 @@ select * from clippings limit 0''', True)
         self.conn.close()
         pass
 
-    def __addEntry__(self, book, pos, date, clip):
+    def __addEntry__(self, book, pos, typ, date, clip):
         """Check if book is already in store, and returns a tuple to indicate if
         clip and book are new: (new_book, new_clip).
 
@@ -250,14 +246,13 @@ select id from blacklist where book = '%s' and content = '%s'
 
             if row is None:
                 self.__execute__('''
-    insert into clippings values (NULL, '%s', %u, '%s', '%s')
-    ''' % (book, pos, date, clip), False)
+    insert into clippings values (NULL, '%s', '%s', '%s', '%s', '%s')
+    ''' % (book, pos, typ, date, clip), False)
                 new_clip = True
             else:
                 new_clip = False
 
         return (new_book, new_clip)
-
 
     def __cleanClipsById__(self, ids):
         if ids is None or len(ids) == 0:
@@ -266,9 +261,10 @@ select id from blacklist where book = '%s' and content = '%s'
         PDEBUG('ids: %s', ids)
         id_strs = []
         for id in ids:
-            id_strs.append("%d" % id)
+            id_strs.append("'%s'" % id)
 
-        sql = '''insert into blacklist select * from clippings where id in (%s)''' % ", ".join(id_strs)
+        sql = '''insert into blacklist select * from clippings where id in (%s)''' % ", ".join(
+            id_strs)
         self.__execute__(sql, False)
 
         sql = '''delete from clippings where id in (%s)''' % ", ".join(id_strs)
@@ -286,7 +282,8 @@ select id from blacklist where book = '%s' and content = '%s'
         books_added = 0
         records_added = 0
         books_to_clean = set()
-        tmp_fd = open('/tmp/tmp_write.txt', 'w')
+
+        PDEBUG('Loading from file: %s', path)
 
         with open(path) as fd:
             while True:
@@ -315,15 +312,12 @@ select id from blacklist where book = '%s' and content = '%s'
                         mark = handleStr(m.group(4).strip())
                         pos = m.end(0)
 
-                        tmp_fd.write(book + "\n")
-
-                        bts=book.encode()
+                        bts = book.encode()
                         if bts[0:3] == codecs.BOM_UTF8:
                             PDEBUG('oops: ')
                             PDEBUG('%X-%X-%X', bts[0], bts[1], bts[2])
 
                             sys.exit()
-
 
                         if len(mark) == 0:
                             continue
@@ -335,10 +329,12 @@ select id from blacklist where book = '%s' and content = '%s'
                                 PDEBUG('oops: %s -- %s', book, page)
                                 sys.exit(1)
 
-                        start = int(res.group(1))
+                        pos_str = res.group(1)
+                        typ_str = res.group(2)
 
                         (new_book, new_clip) = \
-                            self.__addEntry__(book, start, time, mark)
+                            self.__addEntry__(
+                                book, pos_str, typ_str, time, mark)
 
                         if new_book:
                             books_added += 1
@@ -346,6 +342,9 @@ select id from blacklist where book = '%s' and content = '%s'
                         if new_clip:
                             books_to_clean.add(book)
                             records_added += 1
+
+        if books_to_clean:
+            PDEBUG('Books to clean: %s', books_to_clean)
 
         for book in books_to_clean:
             self.cleanUpBook(book)
@@ -429,9 +428,9 @@ select id from blacklist where book = '%s' and content = '%s'
 
     def getClipById(self, id):
         sql = '''
-select book, pos, timestamp, content from clippings where id = %d
+select book, pos, type, date, content from clippings where id = %d
 ''' % id
 
         cursor = self.conn.execute(sql)
         r = cursor.fetchone()
-        return Clip(r[0], r[1], r[2], r[3])
+        return Clip(r[0], r[1], r[2], r[3], r[4])

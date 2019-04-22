@@ -53,17 +53,7 @@ class KlipDetailWindow(wx.PopupWindow):
         self.SetSizer(sizer)
         self.SetMinSize(wx.Size(800, 600))
 
-        # pnl.SetSize((sz.width+20, sz.height+20))
-
-        # pnl.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
-        # pnl.Bind(wx.EVT_MOTION, self.OnMouseMotion)
-        # pnl.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
-        # pnl.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
-
-        # self.st.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
-        # self.st.Bind(wx.EVT_MOTION, self.OnMouseMotion)
-        # self.st.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
-        # self.st.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
+        # TODO: add grid sizer, for content: pos, date, type.
 
         wx.CallAfter(self.Refresh)
 
@@ -95,9 +85,9 @@ class KlipDetailWindow(wx.PopupWindow):
         self.Show(False)
         wx.CallAfter(self.Destroy)
 
-    def UpdateContent(self, content, date, pos):
-        PDEBUG('POS: %d, DATE: %s', pos, date)
-        self.st.SetValue(content)
+    def UpdateContent(self, clip):
+        PDEBUG('POS: %d, DATE: %s', clip.pos, clip.date)
+        self.st.SetValue(clip.content)
         PDEBUG('CONTENT: %s', self.st.GetValue())
 
 
@@ -305,7 +295,7 @@ class KlipFrame(wx.Frame):
         txt = item.GetText()
         PDEBUG('ID: %d -- %s', id, txt)
         clip = self.model.getClipById(id)
-        self.detailPanel.UpdateContent(clip.content, clip.date, clip.pos)
+        self.detailPanel.UpdateContent(clip)
         self.detailPanel.Show(True)
         pass
 
