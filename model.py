@@ -378,8 +378,8 @@ select id from blacklist where book = '%s' and content = '%s'
                 old_id = old[0]
                 old_content = old[1]
 
-                PDEBUG('POS: %d -- %d\nOLD: [%d]%s\n[%d]NEW:%s', pos,
-                       old_id,
+                PDEBUG('POS: %s -- %d\nOLD: [%s]%d\n[%s]NEW:%s',
+                       pos, old_id,
                        iter.pos, id,
                        old_content, content)
 

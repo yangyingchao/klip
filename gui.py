@@ -86,7 +86,7 @@ class KlipDetailWindow(wx.PopupWindow):
         wx.CallAfter(self.Destroy)
 
     def UpdateContent(self, clip):
-        PDEBUG('POS: %d, DATE: %s', clip.pos, clip.date)
+        PDEBUG('POS: %s, DATE: %s', clip.pos, clip.date)
         self.st.SetValue(clip.content)
         PDEBUG('CONTENT: %s', self.st.GetValue())
 

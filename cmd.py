@@ -89,6 +89,13 @@ def showFunc(args):
 
     pass
 
+def showGUI(args):
+    """Show GUI
+    """
+    from gui import startGUI
+    startGUI(model)
+    pass
+
 
 def cleanupCallback(lst):
     if lst:
@@ -128,6 +135,7 @@ handlers = {
     "q": exitFunc,
     "show": showFunc,
     "clean": cleanUp,
+    "gui":showGUI,
 }
 
 
