@@ -18,37 +18,61 @@ class KlipDetailWindow(wx.PopupWindow):
 
     def __init__(self, parent, style):
         wx.PopupWindow.__init__(self, parent, style)
-        pnl = self.pnl = wx.Panel(self)
-        pnl.SetBackgroundColour("CADET BLUE")
+        sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.st = wx.StaticText(pnl, -1,
-                           "This is a special kind of top level\n"
-                           "window that can be used for\n"
-                           "popup menus, combobox popups\n"
-                           "and such.\n\n"
-                           "Try positioning the demo near\n"
-                           "the bottom of the screen and \n"
-                           "hit the button again.\n\n"
-                           "In this demo this window can\n"
-                           "be dragged with the left button\n"
-                           "and closed with the right.",
-                           pos=(10, 10))
+        # pnl = self.pnl = wx.Panel(self)
+        # pnl.SetBackgroundColour("CADET BLUE")
 
-        sz = self.st.GetBestSize()
-        self.SetSize((sz.width+20, sz.height+20))
-        pnl.SetSize((sz.width+20, sz.height+20))
+        sizer = wx.BoxSizer(wx.VERTICAL)
 
-        pnl.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
-        pnl.Bind(wx.EVT_MOTION, self.OnMouseMotion)
-        pnl.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
-        pnl.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
+        self.st = wx.TextCtrl(self, -1,
+                              "This is a special kind of top level\n"
+                              "window that can be used for\n"
+                              "popup menus, combobox popups\n"
+                              "and such.\n\n"
+                              "Try positioning the demo near\n"
+                              "the bottom of the screen and \n"
+                              "hit the button again.\n\n"
+                              "In this demo this window can\n"
+                              "be dragged with the left button\n"
+                              "and closed with the right.",
+                              pos=(10, 10),
+                              style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
 
-        self.st.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
-        self.st.Bind(wx.EVT_MOTION, self.OnMouseMotion)
-        self.st.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
-        self.st.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
+        sizer.Add(self.st, 1, wx.EXPAND | wx.ALL, 0)
+
+        btn = wx.Button(self, -1, 'Done')
+        sizer.Add(btn,
+                  0, wx.EXPAND, 0)
+
+        btn.Bind(wx.EVT_BUTTON, self.OnDone)
+
+        # sz = self.st.GetBestSize()
+        # self.SetSize((sz.width+20, sz.height+20))
+
+        self.SetSizer(sizer)
+        self.SetMinSize(wx.Size(800, 600))
+
+        # pnl.SetSize((sz.width+20, sz.height+20))
+
+        # pnl.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
+        # pnl.Bind(wx.EVT_MOTION, self.OnMouseMotion)
+        # pnl.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
+        # pnl.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
+
+        # self.st.Bind(wx.EVT_LEFT_DOWN, self.OnMouseLeftDown)
+        # self.st.Bind(wx.EVT_MOTION, self.OnMouseMotion)
+        # self.st.Bind(wx.EVT_LEFT_UP, self.OnMouseLeftUp)
+        # self.st.Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
 
         wx.CallAfter(self.Refresh)
+
+    def OnDone(self, evt):
+        """Hide this window..
+        """
+        PDEBUG('K: %s', evt)
+        self.Show(False)
+        pass
 
     def OnMouseLeftDown(self, evt):
         self.Refresh()
@@ -73,7 +97,9 @@ class KlipDetailWindow(wx.PopupWindow):
 
     def UpdateContent(self, content, date, pos):
         PDEBUG('POS: %d, DATE: %s', pos, date)
-        self.st.SetLabel(content)
+        self.st.SetValue(content)
+        PDEBUG('CONTENT: %s', self.st.GetValue())
+
 
 class KlipFrame(wx.Frame):
     """
@@ -283,17 +309,17 @@ class KlipFrame(wx.Frame):
         self.detailPanel.Show(True)
         pass
 
+
 def startGUI(controller):
     """
     """
 
-    ## Check wxversion.
+    # Check wxversion.
     version = wx.version().split()[0]
     major = int(version.split('.')[0])
     if major < 4:
         print('Requires wx version > 4.0')
         return
-
 
     app = wx.App()
     frm = KlipFrame(controller)
