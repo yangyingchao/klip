@@ -23,11 +23,12 @@ class KlipDetailWindow(wx.PopupWindow):
                               "This is a special kind of top level\n",
                               style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
 
+        font = self.txt_viewer.GetFont()
+        font.PointSize += 5
+        self.txt_viewer.SetFont(font)
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.txt_viewer, 1, wx.EXPAND | wx.ALL, 0)
-
-
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer.Add(self.txt_viewer, 1, wx.EXPAND | wx.ALL, 0)
 
         gbs = self.gbs = wx.GridBagSizer(vgap=1, hgap=5)
 
@@ -62,12 +63,13 @@ class KlipDetailWindow(wx.PopupWindow):
         btn_done.Bind(wx.EVT_BUTTON, self.OnDone)
 
 
-        sizer.Add(gbs, 1, wx.EXPAND | wx.ALL, 0)
+        self.sizer.Add(gbs, 1, wx.EXPAND | wx.ALL, 0)
 
-        self.SetSizer(sizer)
+        self.SetSizer(self.sizer)
         self.SetMinSize(wx.Size(800, 600))
+        self.SetMaxSize(wx.Size(800, 600))
 
-        # TODO: add grid sizer, for content: pos, date, type.
+        # TODO: add grid self.sizer, for content: pos, date, type.
 
         wx.CallAfter(self.Refresh)
 
@@ -106,6 +108,8 @@ class KlipDetailWindow(wx.PopupWindow):
         self.st_type.SetLabel(clip.typ)
         self.st_date.SetLabel(clip.date)
         self.st_location.SetLabel(clip.pos)
+
+        self.sizer.Fit(self)
 
         PDEBUG('CONTENT: %s', self.txt_viewer.GetValue())
         pass
@@ -315,9 +319,7 @@ class KlipFrame(wx.Frame):
         PDEBUG('ID: %d -- %s', id, txt)
         clip = self.model.getClipById(id)
         self.detailPanel.UpdateContent(clip)
-        self.Refresh()
         self.detailPanel.Show(True)
-
         pass
 
 
