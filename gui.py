@@ -18,37 +18,51 @@ class KlipDetailWindow(wx.PopupWindow):
 
     def __init__(self, parent, style):
         wx.PopupWindow.__init__(self, parent, style)
-        sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # pnl = self.pnl = wx.Panel(self)
-        # pnl.SetBackgroundColour("CADET BLUE")
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-
-        self.st = wx.TextCtrl(self, -1,
-                              "This is a special kind of top level\n"
-                              "window that can be used for\n"
-                              "popup menus, combobox popups\n"
-                              "and such.\n\n"
-                              "Try positioning the demo near\n"
-                              "the bottom of the screen and \n"
-                              "hit the button again.\n\n"
-                              "In this demo this window can\n"
-                              "be dragged with the left button\n"
-                              "and closed with the right.",
-                              pos=(10, 10),
+        self.txt_viewer = wx.TextCtrl(self, -1,
+                              "This is a special kind of top level\n",
                               style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
 
-        sizer.Add(self.st, 1, wx.EXPAND | wx.ALL, 0)
 
-        btn = wx.Button(self, -1, 'Done')
-        sizer.Add(btn,
-                  0, wx.EXPAND, 0)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.txt_viewer, 1, wx.EXPAND | wx.ALL, 0)
 
-        btn.Bind(wx.EVT_BUTTON, self.OnDone)
 
-        # sz = self.st.GetBestSize()
-        # self.SetSize((sz.width+20, sz.height+20))
+
+        gbs = self.gbs = wx.GridBagSizer(vgap=1, hgap=5)
+
+        # type
+        gbs.Add(wx.StaticText(self, -1, "type"),
+                (0, 0), (1, 1), wx.ALIGN_CENTER | wx.ALL, 5)
+
+        self.st_type = wx.StaticText(self, -1, "");
+        gbs.Add(self.st_type,
+                (0, 1), (1, 2), wx.ALIGN_CENTER | wx.ALL, 5)
+
+        # location
+        gbs.Add(wx.StaticText(self, -1, "location"),
+                (1, 0), (1, 1), wx.ALIGN_CENTER | wx.ALL, 5)
+
+        self.st_location = wx.StaticText(self, -1, "")
+        gbs.Add(self.st_location,
+                (1, 1), (1, 2), wx.ALIGN_CENTER | wx.ALL, 5)
+
+        # date
+        gbs.Add(wx.StaticText(self, -1, "date"),
+                (2, 0), (1, 1), wx.ALIGN_CENTER | wx.ALL, 5)
+
+        self.st_date = wx.StaticText(self, -1, "")
+        gbs.Add(self.st_date,
+                (2, 1), (1, 2), wx.ALIGN_CENTER | wx.ALL, 5)
+
+        btn_done = wx.Button(self, -1, 'Done')
+        gbs.Add(btn_done,
+                (3, 5))
+
+        btn_done.Bind(wx.EVT_BUTTON, self.OnDone)
+
+
+        sizer.Add(gbs, 1, wx.EXPAND | wx.ALL, 0)
 
         self.SetSizer(sizer)
         self.SetMinSize(wx.Size(800, 600))
@@ -87,8 +101,14 @@ class KlipDetailWindow(wx.PopupWindow):
 
     def UpdateContent(self, clip):
         PDEBUG('POS: %s, DATE: %s', clip.pos, clip.date)
-        self.st.SetValue(clip.content)
-        PDEBUG('CONTENT: %s', self.st.GetValue())
+        self.txt_viewer.SetValue(clip.content)
+
+        self.st_type.SetLabel(clip.typ)
+        self.st_date.SetLabel(clip.date)
+        self.st_location.SetLabel(clip.pos)
+
+        PDEBUG('CONTENT: %s', self.txt_viewer.GetValue())
+        pass
 
 
 class KlipFrame(wx.Frame):
@@ -144,7 +164,6 @@ class KlipFrame(wx.Frame):
 
         sizer.Add(self.book_list, 1, wx.EXPAND | wx.ALL, 0)
 
-        # pnl_books.SetAutoLayout(True)
         pnl_books.SetSizer(sizer)
 
         # init right panel, show clippings.
@@ -296,7 +315,9 @@ class KlipFrame(wx.Frame):
         PDEBUG('ID: %d -- %s', id, txt)
         clip = self.model.getClipById(id)
         self.detailPanel.UpdateContent(clip)
+        self.Refresh()
         self.detailPanel.Show(True)
+
         pass
 
 
