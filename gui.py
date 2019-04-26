@@ -65,10 +65,10 @@ class KlipDetailWindow(wx.PopupWindow):
 
         self.sizer.Add(gbs, 1, wx.EXPAND | wx.ALL, 0)
 
-        self.SetSizer(self.sizer)
-        self.SetMinSize(wx.Size(800, 600))
+        self.SetMinSize(wx.Size(600, 400))
         self.SetMaxSize(wx.Size(800, 600))
 
+        self.SetSizer(self.sizer)
         # TODO: add grid self.sizer, for content: pos, date, type.
 
         wx.CallAfter(self.Refresh)
@@ -110,7 +110,7 @@ class KlipDetailWindow(wx.PopupWindow):
         self.st_date.SetLabel(clip.date)
         self.st_location.SetLabel(clip.pos)
 
-
+        self.Layout()
         self.sizer.Fit(self)
         pass
 
