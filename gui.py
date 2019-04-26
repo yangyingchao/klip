@@ -28,7 +28,7 @@ class KlipDetailWindow(wx.PopupWindow):
         self.txt_viewer.SetFont(font)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(self.txt_viewer, 1, wx.EXPAND | wx.ALL, 0)
+        self.sizer.Add(self.txt_viewer, 1, wx.EXPAND | wx.ALL, 10)
 
         gbs = self.gbs = wx.GridBagSizer(vgap=1, hgap=5)
 
@@ -73,6 +73,7 @@ class KlipDetailWindow(wx.PopupWindow):
 
         wx.CallAfter(self.Refresh)
 
+
     def OnDone(self, evt):
         """Hide this window..
         """
@@ -109,9 +110,8 @@ class KlipDetailWindow(wx.PopupWindow):
         self.st_date.SetLabel(clip.date)
         self.st_location.SetLabel(clip.pos)
 
-        self.sizer.Fit(self)
 
-        PDEBUG('CONTENT: %s', self.txt_viewer.GetValue())
+        self.sizer.Fit(self)
         pass
 
 
@@ -188,6 +188,9 @@ class KlipFrame(wx.Frame):
                                       wx.ID_ANY,
                                       style=wx.LC_REPORT | wx.LC_NO_HEADER |
                                       wx.LC_HRULES | wx.LC_SINGLE_SEL)
+
+        self.clip_list.InsertColumn(0, "Clip")
+
         books = self.FillBooks()
 
         sizer.Add(self.clip_list, 1, wx.EXPAND | wx.ALL, 0)
@@ -200,6 +203,10 @@ class KlipFrame(wx.Frame):
         font = self.clip_list.GetFont()
         font.PointSize += 3
         self.clip_list.SetFont(font)
+
+        width = self.clip_list.GetSize().GetWidth()*0.5
+        PDEBUG('Update Column Width: %d' % width)
+        self.clip_list.SetColumnWidth(0, width)
 
         # create a menu bar
         self.makeMenuBar()
@@ -293,8 +300,7 @@ class KlipFrame(wx.Frame):
         book = event.GetText().strip()
 
         self.book_title.SetLabel("  %s" % book)
-        self.clip_list.ClearAll()
-        self.clip_list.InsertColumn(0, "Clip")
+        self.clip_list.DeleteAllItems()
 
         iter = self.model.getClipsByName(book)
         idx = 0
@@ -304,11 +310,8 @@ class KlipFrame(wx.Frame):
             item.SetId(idx)
             item.SetText(u"    %s" % (iter.content))
             self.clip_list.InsertItem(item)
-
-            # item = self.clip_list.InsertItem(idx, u"    %s" % (iter.content))
             idx += 1
 
-        self.clip_list.SetColumnWidth(0, -2)
         pass
 
     def OnClipActivated(self, event):

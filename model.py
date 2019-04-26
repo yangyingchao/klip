@@ -5,6 +5,7 @@ import os
 import sqlite3
 from common import PDEBUG
 import re
+import enum
 import codecs
 
 
@@ -170,6 +171,27 @@ class ClipIter(object):
         return False
 
 
+class Action(enum.Enum):
+    APPEND = 0
+    USE_NEW = 1
+    USE_OLD = 2
+
+
+class Range(object):
+    def __init__(self, start, end):
+        super(Range, self).__init__()
+        self._start = start
+        self._end = end
+
+    def __hash__(self):
+        return self._start << 32 | self._end
+
+    def covers(self, other):
+        """Check if this object covers the other object.
+        """
+        return self._start <= other._start and self._end >= other._end
+
+
 class KlipModel(object):
     def __init__(self, readonly=False):
         """
@@ -261,7 +283,7 @@ select id from blacklist where book = '%s' and content = '%s'
         PDEBUG('ids: %s', ids)
         id_strs = []
         for id in ids:
-            id_strs.append("'%s'" % id)
+            id_strs.append("'%d'" % id)
 
         sql = '''insert into blacklist select * from clippings where id in (%s)''' % ", ".join(
             id_strs)
@@ -366,49 +388,67 @@ select id from blacklist where book = '%s' and content = '%s'
         """
         PDEBUG('Cleaning book: %s', book)
         clips = {}  # pos - (id, content)
-        dup_id = []
+        dup_id = []  # array of cons, where cdr should be dropped...
 
+        # TODO: check if position overlaps....
         iter = self.getClipsByName(book)
         while iter.next():
             id = iter.id
             pos = iter.pos
-            content = iter.content.strip(u' "“')
-            if iter.pos in clips:
-                old = clips[pos]
-                old_id = old[0]
-                old_content = old[1]
 
-                PDEBUG('\nPOS: %s : %d -- %s : %d\nOLD: %s\nNEW:%s',
-                       pos, old_id,
-                       iter.pos, id,
-                       old_content, content)
+            # simply ignore it if '-' not in pos.
+            if '-' not in pos:
+                continue
 
-                if old_content.startswith(content) or \
-                   content.endswith(old_content):
-                    # existing one should be replaced with new one
-                    dup_id.append(old_id)
-                    clips[pos] = (id, content)
-                    continue
-                elif content.startswith(old_content) or \
-                        old_content.endswith(content):
-                    # new one should be dropped..
-                    dup_id.append(id)
-                    continue
+            pos_array = []
+            for p in pos.split('-'):
+                pos_array.append(int(p))
 
-            clips[iter.pos] = (id, content)
+            # Find nearest position, for now, linear search, change to binary
+            # search later....
+
+            action = Action.APPEND  # 0: append, 1: use new, 2: use old
+            key_new = Range(pos_array[0], pos_array[1])
+
+            for key in clips.keys():
+                if key.covers(key_new):
+                    action = Action.USE_OLD
+                    break
+                elif key_new.covers(key):
+                    action = Action.USE_NEW
+                    break
+                pass
+
+            if action == Action.APPEND:
+                clips[key_new] = id
+            elif action == Action.USE_NEW:
+                old_id = clips.pop(key)
+                dup_id.append((id, old_id))
+                clips[key_new] = id
+            elif action == Action.USE_OLD:
+                old_id = clips[key]
+                dup_id.append((old_id, id))
+            else:
+                print('Should not be here: %s' % (action))
 
         if dup_id:
             do_remove = True
             if callback:
                 to_be_remove = []
-                for id in dup_id:
-                    clip = self.getClipById(id)
-                    to_be_remove.append('%s -- %s' % (clip.book, clip.content))
+                for (keep, drop) in dup_id:
+                    clip_keep = self.getClipById(keep)
+                    clip_drop = self.getClipById(drop)
 
-                do_remove = callback(to_be_remove)
+                    to_be_remove.append((clip_keep.content, clip_drop.content))
+
+                do_remove = callback(book, to_be_remove)
 
             if do_remove:
-                self.__cleanClipsById__(dup_id)
+                ids = []
+                for id in dup_id:
+                    ids.append(id[1])
+
+                self.__cleanClipsById__(ids)
 
         pass
 
@@ -419,17 +459,17 @@ select id from blacklist where book = '%s' and content = '%s'
         return BookIter(cur)
 
     def getClipsByName(self, book):
-        sql = '''select id, book, pos, content from clippings'''
-        if book is not None:
-            sql += ''' where book = '%s'  ''' % book
+        sql = '''
+        select id, book, pos, content from clippings where book = '%s'
+        ''' % book
 
         cursor = self.conn.execute(sql)
         return ClipIter(cursor)
 
     def getClipById(self, id):
         sql = '''
-select book, pos, type, date, content from clippings where id = %d
-''' % id
+        select book, pos, type, date, content from clippings where id = %d
+        ''' % id
 
         cursor = self.conn.execute(sql)
         r = cursor.fetchone()

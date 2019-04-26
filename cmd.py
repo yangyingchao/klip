@@ -54,18 +54,30 @@ def showBooks():
     pass
 
 
-def showClips(book=None):
-    """ Show Clips from books.
-    """
-    print('Showing clips:')
+def showClipsByName(book):
+    print('Showing clips from book: %s' % book)
     iter = model.getClipsByName(book)
     idx = 1
     while iter.next():
         idx += 1
-        print('    [%d] -- %s -- %s' % (iter.id, iter.book, iter.content))
+        print('    [%d] -- %s -- %s' % (iter.id, iter.pos, iter.content))
 
     print('\nTotal clippings: %d' % (idx))
-    pass
+
+    return idx
+
+
+def showClips():
+    """ Show Clips from all books.
+    """
+    counter_book = 0
+    counter_clips = 0
+    iter_book = model.getBooks()
+    while iter_book.next():
+        counter_book += 1
+        counter_clips += showClipsByName(iter_book.book)
+
+    print('\nTotal books: %d, total clips: %d' % (counter_book, counter_clips))
 
 
 def showFunc(args):
@@ -74,12 +86,18 @@ def showFunc(args):
         show clips
     """
     if args:
-        target = args[0].lower()
+        target = args.pop(0).lower()
         if target == "books":
             showBooks()
         elif target == "clips":
-            if len(args) > 1:
-                showClips(" ".join(args[1:]))
+            if args:
+                showClipsByName(" ".join(args[1:]))
+
+                # # TODO: showClipsById...
+                # if len(args) == 1 and re.match(""):
+                #     showClipsById()
+                # else:
+                #     showClipsByName(" ".join(args[1:]))
             else:
                 showClips()
         else:
@@ -89,6 +107,7 @@ def showFunc(args):
 
     pass
 
+
 def showGUI(args):
     """Show GUI
     """
@@ -97,13 +116,16 @@ def showGUI(args):
     pass
 
 
-def cleanupCallback(lst):
+def cleanupCallback(book, lst):
     if lst:
-        print('Going to remove following items:\n')
+        print('Going to remove following items for book: %s\n' % book)
         idx = 1
-        for item in lst:
-            print('    [%d]: %s' % (idx, item))
+        for (keep, drop) in lst:
+            print('[%d]' % idx)
+            print('    KEEP: %s' % (keep))
+            print('    DROP: %s' % (drop))
             idx += 1
+            print('')
 
         print('\nContintue? Y/[N]')
 
@@ -135,7 +157,7 @@ handlers = {
     "q": exitFunc,
     "show": showFunc,
     "clean": cleanUp,
-    "gui":showGUI,
+    "gui": showGUI,
 }
 
 
