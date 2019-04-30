@@ -193,11 +193,22 @@ class Range(object):
 
 
 class KlipModel(object):
-    def __init__(self, readonly=False):
+    def __init__(self, readonly=False, trial=False):
         """
         """
         super(KlipModel, self).__init__()
-        self.conn = sqlite3.connect(getDBPath(readonly))
+
+        self.conn = None
+        self.c = None
+
+        # trial is used to make lsp happy...
+        if trial:
+            return
+        else:
+            self.__open__()
+
+    def __open__(self):
+        self.conn = sqlite3.connect(getDBPath(False))
         self.c = self.conn.cursor()
         self.__execute__(CLIP_CREATE, True)
         self.__execute__(BOOK_CREATE, True)
@@ -223,8 +234,9 @@ select * from clippings limit 0''', True)
     def __del__(self):
         """
         """
-        self.conn.commit()
-        self.conn.close()
+        if self.conn:
+            self.conn.commit()
+            self.conn.close()
         pass
 
     def __addEntry__(self, book, pos, typ, date, clip):
@@ -474,3 +486,20 @@ select id from blacklist where book = '%s' and content = '%s'
         cursor = self.conn.execute(sql)
         r = cursor.fetchone()
         return Clip(r[0], r[1], r[2], r[3], r[4])
+
+    def searchClips(self, args):
+        """Search clippings containing given keywords.
+        """
+        query = '''select id, book, pos, content from clippings '''
+
+        if args is None:
+            cursor = self.conn.execute(query)
+        elif isinstance(args, list):
+            query += "where content like ? or book like ?"
+            conds = '%' + '%'.join(args) + '%'
+
+            cursor = self.conn.execute(query,  (conds, conds))
+        else:
+            raise Exception("Expecting a list, but got: %s." % type(args))
+
+        return ClipIter(cursor)

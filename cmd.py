@@ -4,15 +4,17 @@
 import sys
 import traceback
 from common import getClipPath
+from model import KlipModel
 
-model = None
+model = KlipModel(True)
+
 stop = False
 
 
 def loadFile(args):
     """Load clippings from file (if specified), or from default file.
     """
-    if args and len(args) > 0:
+    if args:
         path = args[0]
     else:
         path = getClipPath()
@@ -54,16 +56,19 @@ def showBooks():
     pass
 
 
-def showClipsByName(book):
-    print('Showing clips from book: %s' % book)
-    iter = model.getClipsByName(book)
-    idx = 1
-    while iter.next():
+def showClipIter(it):
+    idx = 0
+    while it.next():
         idx += 1
-        print('    [%d] -- %s -- %s' % (iter.id, iter.pos, iter.content))
+        print('    [%d] -- %s -- %s' % (it.id, it.pos, it.content))
 
     print('\nTotal clippings: %d' % (idx))
+    return idx
 
+
+def showClipsByName(book):
+    print('Showing clips from book: %s' % book)
+    idx = showClipIter(model.getClipsByName(book))
     return idx
 
 
@@ -148,6 +153,14 @@ def cleanUp(books=None):
         model.cleanUpBooks(cleanupCallback)
 
 
+def searchClips(args):
+    """Search clippings.
+    Arguments:
+    - `args`: List of keywords.
+    """
+    showClipIter(model.searchClips(args))
+
+
 handlers = {
     "load": loadFile,
     "help": showHelp,
@@ -158,6 +171,7 @@ handlers = {
     "show": showFunc,
     "clean": cleanUp,
     "gui": showGUI,
+    'search': searchClips,
 }
 
 
@@ -169,13 +183,11 @@ def startCMD(model_):
         try:
             print('>')
             line = sys.stdin.readline().strip()
-            array = line.split()
-            l = len(array)
-            if l == 0:
+            args = line.split()
+            if not args:
                 continue
 
-            cmd = array[0].lower()
-            args = array[1:] if l > 1 else None
+            cmd = args.pop(0).lower()
             handler = handlers.get(cmd, None)
             if handler is None:
                 print('CMD: %s not implemented' % (cmd))
