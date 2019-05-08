@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import re
 import traceback
 from common import getClipPath
 from model import KlipModel
@@ -68,8 +69,8 @@ def showClipIter(it):
 
 def showClipsByName(book):
     print('Showing clips from book: %s' % book)
-    idx = showClipIter(model.getClipsByName(book))
-    return idx
+    num = showClipIter(model.getClipsByName(book))
+    return num
 
 
 def showClips():
@@ -96,13 +97,17 @@ def showFunc(args):
             showBooks()
         elif target == "clips":
             if args:
-                showClipsByName(" ".join(args[1:]))
+                book = None
+                if len(args) == 1:
+                    m = re.match("\\[(\\d+)\\]", args[0])
+                    if m:
+                        bi = model.getBooksById(int(m.group(1)))
+                        if bi.next():
+                            book = bi.book
 
-                # # TODO: showClipsById...
-                # if len(args) == 1 and re.match(""):
-                #     showClipsById()
-                # else:
-                #     showClipsByName(" ".join(args[1:]))
+                if book is None:
+                    book = " ".join(args[1:])
+                showClipsByName(book)
             else:
                 showClips()
         else:

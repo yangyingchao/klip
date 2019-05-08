@@ -391,12 +391,16 @@ select id from blacklist where book = '%s' and content = '%s'
     def cleanUpBooks(self, callback=None):
         """
         """
+        num = 0
         iter = self.getBooks()
         while iter.next():
-            self.cleanUpBook(iter.book, callback)
+            num += self.cleanUpBook(iter.book, callback)
+
+        PDEBUG('Total %d records cleaned up.', num)
+        return num
 
     def cleanUpBook(self, book, callback=None):
-        """
+        """Clean up book
         """
         PDEBUG('Cleaning book: %s', book)
         clips = {}  # pos - (id, content)
@@ -443,6 +447,7 @@ select id from blacklist where book = '%s' and content = '%s'
             else:
                 print('Should not be here: %s' % (action))
 
+        ret = 0
         if dup_id:
             do_remove = True
             if callback:
@@ -461,13 +466,21 @@ select id from blacklist where book = '%s' and content = '%s'
                     ids.append(id[1])
 
                 self.__cleanClipsById__(ids)
+                ret += len(dup_id)
 
-        pass
+        return ret
 
     def getBooks(self):
         """Return iterator of books.
         """
         cur = self.conn.execute('''select ID, NAME from books;''')
+        return BookIter(cur)
+
+    def getBooksById(self, id):
+        """Return iterator of books.
+        """
+        cur = self.conn.execute(
+            '''select ID, NAME from books where ID = %d;''' % id)
         return BookIter(cur)
 
     def getClipsByName(self, book):

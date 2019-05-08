@@ -225,8 +225,12 @@ class KlipFrame(wx.Frame):
         fileMenu = wx.Menu()
         # The "\t..." syntax defines an accelerator key that also triggers
         # the same event
-        loadItem = fileMenu.Append(-1, "&Load...\tCtrl-L",
+        loadItem = fileMenu.Append(-1, "&Load...",
                                    "Load clippings...")
+
+        cleanItem = fileMenu.Append(-1, "&Clean...",
+                                   "Clean clippings...")
+
         fileMenu.AppendSeparator()
         # When using a stock ID we don't need to specify the menu item's
         # label
@@ -251,12 +255,20 @@ class KlipFrame(wx.Frame):
         # each of the menu items. That means that when that menu item is
         # activated then the associated handler function will be called.
         self.Bind(wx.EVT_MENU, self.OnLoadFile, loadItem)
+        self.Bind(wx.EVT_MENU, self.cleanRecords, cleanItem)
         self.Bind(wx.EVT_MENU, self.OnExit,  exitItem)
         self.Bind(wx.EVT_MENU, self.OnAbout, aboutItem)
 
     def OnExit(self, event):
         """Close the frame, terminating the application."""
         self.Close(True)
+
+    def cleanRecords(self, event):
+        """Close the frame, terminating the application."""
+        total = self.model.cleanUpBooks()
+        if total > 0:
+            pass # Add dialog??
+
 
     def OnLoadFile(self, event):
         """Load clips from file.."""
