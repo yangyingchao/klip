@@ -3,6 +3,7 @@
 
 import wx
 import wx.lib.mixins.listctrl as listmix
+from wx.lib.expando import ExpandoTextCtrl, EVT_ETC_LAYOUT_NEEDED
 from common import getClipPath, PDEBUG
 
 
@@ -19,60 +20,67 @@ class KlipDetailWindow(wx.PopupWindow):
     def __init__(self, parent, style):
         wx.PopupWindow.__init__(self, parent, style)
 
-        self.txt_viewer = wx.TextCtrl(self, -1,
-                              "This is a special kind of top level\n",
-                              style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
+        self.eom = ExpandoTextCtrl(self, size=(600, -1),
+                                   value="This control will expand as you type")
 
-        font = self.txt_viewer.GetFont()
+        self.eom.SetMaxHeight(600)
+        self.Bind(EVT_ETC_LAYOUT_NEEDED, self.OnRefit, self.eom)
+
+        font = self.eom.GetFont()
         font.PointSize += 5
-        self.txt_viewer.SetFont(font)
+        self.eom.SetFont(font)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(self.txt_viewer, 1, wx.EXPAND | wx.ALL, 10)
 
-        gbs = self.gbs = wx.GridBagSizer(vgap=1, hgap=5)
+        self.sizer.Add(self.eom, 1, wx.EXPAND | wx.ALL, 10)
+
 
         # type
-        gbs.Add(wx.StaticText(self, -1, "type"),
-                (0, 0), (1, 1), wx.ALIGN_CENTER | wx.ALL, 5)
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        row.Add(wx.StaticText(self, -1, "type     "),
+                0, wx.LEFT|wx.RIGHT, 10)
 
         self.st_type = wx.StaticText(self, -1, "");
-        gbs.Add(self.st_type,
-                (0, 1), (1, 2), wx.ALIGN_CENTER | wx.ALL, 5)
+        row.Add(self.st_type, 0, wx.LEFT | wx.RIGHT, 10)
+        self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, 2)
 
         # location
-        gbs.Add(wx.StaticText(self, -1, "location"),
-                (1, 0), (1, 1), wx.ALIGN_CENTER | wx.ALL, 5)
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        row.Add(wx.StaticText(self, -1, "location"),
+                0, wx.LEFT | wx.RIGHT | wx.ALIGN_RIGHT, 10)
 
         self.st_location = wx.StaticText(self, -1, "")
-        gbs.Add(self.st_location,
-                (1, 1), (1, 2), wx.ALIGN_CENTER | wx.ALL, 5)
+        row.Add(self.st_location, 0, wx.LEFT | wx.RIGHT, 10)
+
+        self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, 2)
 
         # date
-        gbs.Add(wx.StaticText(self, -1, "date"),
-                (2, 0), (1, 1), wx.ALIGN_CENTER | wx.ALL, 5)
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        row.Add(wx.StaticText(self, -1, "date     "),
+                0, wx.LEFT | wx.RIGHT | wx.ALIGN_RIGHT, 10)
 
         self.st_date = wx.StaticText(self, -1, "")
-        gbs.Add(self.st_date,
-                (2, 1), (1, 2), wx.ALIGN_CENTER | wx.ALL, 5)
+        row.Add(self.st_date, 0, wx.LEFT | wx.RIGHT, 10)
+        self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, 5)
 
+        # done button
         btn_done = wx.Button(self, -1, 'Done')
-        gbs.Add(btn_done,
-                (3, 5))
-
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        row.Add(btn_done, 0, wx.ALL, 10)
         btn_done.Bind(wx.EVT_BUTTON, self.OnDone)
+        self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, 0)
 
 
-        self.sizer.Add(gbs, 1, wx.EXPAND | wx.ALL, 0)
+        self.SetSizerAndFit(self.sizer)
 
-        self.SetMinSize(wx.Size(600, 400))
-        self.SetMaxSize(wx.Size(800, 600))
-
-        self.SetSizer(self.sizer)
-        # TODO: add grid self.sizer, for content: pos, date, type.
-
-        wx.CallAfter(self.Refresh)
-
+    def OnRefit(self, evt):
+        # The Expando control will redo the layout of the
+        # sizer it belongs to, but sometimes this may not be
+        # enough, so it will send us this event so we can do any
+        # other layout adjustments needed.  In this case we'll
+        # just resize the frame to fit the new needs of the sizer.
+        self.Fit()
+        pass
 
     def OnDone(self, evt):
         """Hide this window..
@@ -104,7 +112,7 @@ class KlipDetailWindow(wx.PopupWindow):
 
     def UpdateContent(self, clip):
         PDEBUG('POS: %s, DATE: %s', clip.pos, clip.date)
-        self.txt_viewer.SetValue(clip.content)
+        self.eom.SetValue(clip.content)
 
         self.st_type.SetLabel(clip.typ)
         self.st_date.SetLabel(clip.date)
@@ -132,6 +140,7 @@ class KlipFrame(wx.Frame):
 
         sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
         sp.SetSplitMode(wx.SPLIT_VERTICAL)
+        self.detailPanel = KlipDetailWindow(self, wx.SIMPLE_BORDER)
         sp.SetMinimumPaneSize(50)
 
         # create a panel in the frame
@@ -196,7 +205,7 @@ class KlipFrame(wx.Frame):
         sizer.Add(self.clip_list, 1, wx.EXPAND | wx.ALL, 0)
 
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED,
-                  self.OnClipActivated, self.clip_list)
+                  self.showClipDetail, self.clip_list)
 
         pnl_clips.SetSizer(sizer)
 
@@ -326,7 +335,7 @@ class KlipFrame(wx.Frame):
 
         pass
 
-    def OnClipActivated(self, event):
+    def showClipDetail(self, event):
 
         item = event.GetItem()
         id = item.GetData()
@@ -334,9 +343,31 @@ class KlipFrame(wx.Frame):
         PDEBUG('ID: %d -- %s', id, txt)
         clip = self.model.getClipById(id)
         self.detailPanel.UpdateContent(clip)
+
+        ## TODO:  adjust position of detail window.
+        # self.detailPanel.Position(wx.Point(0,0), wx.Size(0,0))
         self.detailPanel.Show(True)
         pass
 
+
+def startGUI(controller):
+    """
+    """
+
+    # Check wxversion.
+    version = wx.version().split()[0]
+    major = int(version.split('.')[0])
+    if major < 4:
+        print('Requires wx version > 4.0')
+        return
+
+    app = wx.App()
+    frm = KlipFrame(controller)
+    self.detailPanel.UpdateContent(clip)
+
+    app.MainLoop()
+
+    pass
 
 def startGUI(controller):
     """
