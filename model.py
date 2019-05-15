@@ -487,7 +487,7 @@ select id from blacklist where book = '%s' and content = '%s'
         sql = '''
         select id, book, pos, content from clippings where book = '%s'
         ''' % book
-
+        PDEBUG('SQL: %s', sql)
         cursor = self.conn.execute(sql)
         return ClipIter(cursor)
 

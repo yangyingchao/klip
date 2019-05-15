@@ -34,13 +34,12 @@ class KlipDetailWindow(wx.PopupWindow):
 
         self.sizer.Add(self.eom, 1, wx.EXPAND | wx.ALL, 10)
 
-
         # type
         row = wx.BoxSizer(wx.HORIZONTAL)
         row.Add(wx.StaticText(self, -1, "type     "),
-                0, wx.LEFT|wx.RIGHT, 10)
+                0, wx.LEFT | wx.RIGHT, 10)
 
-        self.st_type = wx.StaticText(self, -1, "");
+        self.st_type = wx.StaticText(self, -1, "")
         row.Add(self.st_type, 0, wx.LEFT | wx.RIGHT, 10)
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, 2)
 
@@ -69,7 +68,6 @@ class KlipDetailWindow(wx.PopupWindow):
         row.Add(btn_done, 0, wx.ALL, 10)
         btn_done.Bind(wx.EVT_BUTTON, self.OnDone)
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, 0)
-
 
         self.SetSizerAndFit(self.sizer)
 
@@ -131,6 +129,8 @@ class KlipFrame(wx.Frame):
         """
         """
         self.model = model_
+        self._book = None
+        self._search_target = None
 
         super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760))
         # ensure the parent's __init__ is called
@@ -152,14 +152,22 @@ class KlipFrame(wx.Frame):
             round(self.GetSize().GetWidth() * 0.3)))
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(wx.Button(pnl_books, -1, 'Search box will be here'),
+
+        self.search = wx.SearchCtrl(pnl_books, size=(
+            200, -1), style=wx.TE_PROCESS_ENTER)
+        self.search.ShowSearchButton(True)
+        self.search.ShowCancelButton(True)
+
+        self.Bind(wx.EVT_SEARCHCTRL_SEARCH_BTN, self.OnSearch, self.search)
+        self.Bind(wx.EVT_SEARCHCTRL_CANCEL_BTN, self.OnCancelSearch, self.search)
+
+        sizer.Add(self.search,
                   0, wx.EXPAND, 0)
 
         self.book_list = KlipListCtrl(pnl_books,
                                       wx.ID_ANY,
                                       style=wx.LC_REPORT | wx.LC_NO_HEADER |
                                       wx.LC_HRULES | wx.LC_SINGLE_SEL)
-        books = self.FillBooks()
 
         font = self.book_list.GetFont()
         font.PointSize += 5
@@ -170,10 +178,10 @@ class KlipFrame(wx.Frame):
         self.Bind(wx.EVT_LIST_ITEM_SELECTED,
                   self.OnBookSelected, self.book_list)
 
-        st2 = wx.StaticText(pnl_books, label="BOOKS (%d)" %
-                            books, pos=(25, 25))
+        self._total_books = wx.StaticText(pnl_books, label="BOOKS (%d)" %
+                                          0, pos=(25, 25))
 
-        sizer.Add(st2, 0, wx.LEFT, 0)
+        sizer.Add(self._total_books, 0, wx.LEFT, 0)
 
         sizer.Add(self.book_list, 1, wx.EXPAND | wx.ALL, 0)
 
@@ -200,7 +208,7 @@ class KlipFrame(wx.Frame):
 
         self.clip_list.InsertColumn(0, "Clip")
 
-        books = self.FillBooks()
+        books = self.fillBooks()
 
         sizer.Add(self.clip_list, 1, wx.EXPAND | wx.ALL, 0)
 
@@ -238,7 +246,7 @@ class KlipFrame(wx.Frame):
                                    "Load clippings...")
 
         cleanItem = fileMenu.Append(-1, "&Clean...",
-                                   "Clean clippings...")
+                                    "Clean clippings...")
 
         fileMenu.AppendSeparator()
         # When using a stock ID we don't need to specify the menu item's
@@ -276,14 +284,17 @@ class KlipFrame(wx.Frame):
         """Close the frame, terminating the application."""
         total = self.model.cleanUpBooks()
         if total > 0:
-            pass # Add dialog??
-
+            pass  # Add dialog??
 
     def OnLoadFile(self, event):
         """Load clips from file.."""
 
         (books, clips) = self.model.loadFile(getClipPath())
-        self.FillBooks()
+        if books > 0:
+            self.fillBooks()
+        if clips > 0 or books > 0:
+            self.showClipsOfBook()
+
         wx.MessageBox("Loaded %d books with %d clips." % (books, clips))
 
     def OnAbout(self, event):
@@ -292,7 +303,23 @@ class KlipFrame(wx.Frame):
                       "About Hello World 2",
                       wx.OK | wx.ICON_INFORMATION)
 
-    def FillBooks(self):
+    def OnCancelSearch(self, evt):
+        PDEBUG('ENTER')
+        self.showClipsOfBook()
+
+    def OnSearch(self, evt):
+        PDEBUG('ENTER')
+        target = self.search.GetValue()
+        args = target.split()
+        if not args:
+            PDEBUG('empty search target...')
+            return
+
+        it = self.model.searchClips(args)
+        self.showClips('Result for "%s"' % target, it)
+        pass
+
+    def fillBooks(self):
         """Fill book list.
         """
 
@@ -310,9 +337,7 @@ class KlipFrame(wx.Frame):
 
         width = self.book_list.GetSize().GetWidth()*0.5
         self.book_list.SetColumnWidth(0, width)
-        # self.book_list.SetFont(wx.Font(32, wx.FONTFAMILY_MODERN,
-        #                                wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-
+        self._total_books.SetLabel('BOOKS (%d)' % idx)
         return idx
 
     def OnBookSelected(self, event):
@@ -320,16 +345,36 @@ class KlipFrame(wx.Frame):
         """
         book = event.GetText().strip()
 
-        self.book_title.SetLabel("  %s" % book)
+        self.showClipsOfBook(book)
+        pass
+
+    def showClipsOfBook(self, book=None):
+        """Show clips of book.
+        """
+        if book:
+            self._book = book
+
+        if self._book is None:
+            PDEBUG('No book selected.')
+            return
+
+        PDEBUG('Book: %s', self._book)
+        iter = self.model.getClipsByName(self._book)
+        self.showClips(self._book, iter)
+        pass
+
+    def showClips(self, title, it):
+        """Show contents in clip_lis.
+        """
+        self.book_title.SetLabel("  %s" % title)
         self.clip_list.DeleteAllItems()
 
-        iter = self.model.getClipsByName(book)
         idx = 0
-        while iter.next():
+        while it.next():
             item = wx.ListItem()
-            item.SetData(iter.id)
+            item.SetData(it.id)
             item.SetId(idx)
-            item.SetText(u"    %s" % (iter.content))
+            item.SetText(u"    %s" % (it.content))
             self.clip_list.InsertItem(item)
             idx += 1
 
@@ -344,7 +389,7 @@ class KlipFrame(wx.Frame):
         clip = self.model.getClipById(id)
         self.detailPanel.UpdateContent(clip)
 
-        ## TODO:  adjust position of detail window.
+        # TODO:  adjust position of detail window.
         # self.detailPanel.Position(wx.Point(0,0), wx.Size(0,0))
         self.detailPanel.Show(True)
         pass
@@ -368,6 +413,7 @@ def startGUI(controller):
     app.MainLoop()
 
     pass
+
 
 def startGUI(controller):
     """
