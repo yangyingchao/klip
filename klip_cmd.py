@@ -4,8 +4,8 @@
 import sys
 import re
 import traceback
-from common import getClipPath
-from model import KlipModel
+from klip_common import getClipPath
+from klip_model import KlipModel
 
 model = KlipModel(True)
 

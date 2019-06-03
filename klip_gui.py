@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import wx
 import wx.lib.mixins.listctrl as listmix
 from wx.lib.expando import ExpandoTextCtrl, EVT_ETC_LAYOUT_NEEDED
-from common import getClipPath, PDEBUG
+from klip_common import getClipPath, PDEBUG
 
 
 class KlipListCtrl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
@@ -17,9 +17,12 @@ class KlipListCtrl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
 class KlipDetailWindow(wx.PopupWindow):
     """Adds a bit of text and mouse movement to the wx.PopupWindow"""
 
-    def __init__(self, parent, style):
+    def __init__(self, parent, style, model):
         wx.PopupWindow.__init__(self, parent, style)
 
+        self.model = model
+
+        self._clip = None
         self.eom = ExpandoTextCtrl(self, size=(600, -1),
                                    value="This control will expand as you type")
 
@@ -84,7 +87,11 @@ class KlipDetailWindow(wx.PopupWindow):
         """Hide this window..
         """
         PDEBUG('K: %s', evt)
+        text = self.eom.GetValue()
+        self.model.updateClip(self._clip, text)
+
         self.Show(False)
+
         pass
 
     def OnMouseLeftDown(self, evt):
@@ -109,6 +116,7 @@ class KlipDetailWindow(wx.PopupWindow):
         wx.CallAfter(self.Destroy)
 
     def UpdateContent(self, clip):
+        self._clip = clip
         PDEBUG('POS: %s, DATE: %s', clip.pos, clip.date)
         self.eom.SetValue(clip.content)
 
@@ -135,13 +143,11 @@ class KlipFrame(wx.Frame):
         super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760))
         # ensure the parent's __init__ is called
 
-        self.detailPanel = KlipDetailWindow(self, wx.SIMPLE_BORDER)
-        self.SetMinSize(wx.Size(800, 600))
-
         sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
         sp.SetSplitMode(wx.SPLIT_VERTICAL)
-        self.detailPanel = KlipDetailWindow(self, wx.SIMPLE_BORDER)
         sp.SetMinimumPaneSize(50)
+        self.detailPanel = KlipDetailWindow(self, wx.SIMPLE_BORDER, self.model)
+        self.SetMinSize(wx.Size(800, 600))
 
         # create a panel in the frame
         pnl_books = wx.Panel(sp)
@@ -374,7 +380,7 @@ class KlipFrame(wx.Frame):
             item = wx.ListItem()
             item.SetData(it.id)
             item.SetId(idx)
-            item.SetText(u"    %s" % (it.content))
+            item.SetText(u"    %s\n" % (it.content))
             self.clip_list.InsertItem(item)
             idx += 1
 
@@ -408,7 +414,6 @@ def startGUI(controller):
 
     app = wx.App()
     frm = KlipFrame(controller)
-    self.detailPanel.UpdateContent(clip)
 
     app.MainLoop()
 

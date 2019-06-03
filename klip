@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from enum import Enum
-from model import KlipModel
+from klip_model import KlipModel
 import argparse
-import common
+import klip_common
 
 
 DESCRIPTION = '''
@@ -37,15 +37,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.debug:
-        common.debug_mode = True
+        klip_common.debug_mode = True
     else:
-        common.debug_mode = False
+        klip_common.debug_mode = False
 
     if args.ui == UIMode.CMD:
-        from cmd import startCMD
+        from klip_cmd import startCMD
         startCMD(m)
     elif args.ui == UIMode.GUI:
-        from gui import startGUI
+        from klip_gui import startGUI
         startGUI(m)
     else:
         print('oops.')

@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
 import os
 import sqlite3
-from common import PDEBUG
+from klip_common import PDEBUG
 import re
 import enum
 import codecs
@@ -32,7 +32,7 @@ def handleStr(ins):
         if s == "'":
             s = '"'
         out += s
-    return out
+    return out.strip()
 
 
 boms = [codecs.BOM_UTF8]
@@ -136,9 +136,10 @@ class BookIter(object):
 
 
 class Clip(object):
-    def __init__(self, book, pos, typ, date, content):
+    def __init__(self, book, id, pos, typ, date, content):
         super(Clip, self).__init__()
         self.book = book
+        self.id = id
         self.pos = pos
         self.typ = typ
         self.date = date
@@ -498,7 +499,7 @@ select id from blacklist where book = '%s' and content = '%s'
 
         cursor = self.conn.execute(sql)
         r = cursor.fetchone()
-        return Clip(r[0], r[1], r[2], r[3], r[4])
+        return Clip(r[0], id, r[1], r[2], r[3], r[4])
 
     def searchClips(self, args):
         """Search clippings containing given keywords.
@@ -516,3 +517,22 @@ select id from blacklist where book = '%s' and content = '%s'
             raise Exception("Expecting a list, but got: %s." % type(args))
 
         return ClipIter(cursor)
+
+    def updateClip(self, clip, text):
+        """Update clip if text is changed.
+
+        Arguments:
+
+        - `clip`:
+        - `text`:
+        """
+        text = handleStr(text)
+
+        if clip.content == text:
+            return
+
+        SQL=''' update clippings set content = '?' where ID = ? '''.format (
+            text, clip.id)
+        self.conn.execute(SQL)
+
+        pass
