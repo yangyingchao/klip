@@ -8,11 +8,10 @@ import re
 import enum
 import codecs
 
-
 PAGE_SIZE = 4096
 
-R_MATCH_ENTRY = re.compile(
-    u'^(.*?)\n- (.*?) \\| (.*?)\n(.*?)\n==========', re.DOTALL | re.MULTILINE)
+R_MATCH_ENTRY = re.compile(u'^(.*?)\n- (.*?) \\| (.*?)\n(.*?)\n==========',
+                           re.DOTALL | re.MULTILINE)
 
 R_MATCH_POS = re.compile(u'.*?位置 #(\d+(?:-\d+)?).*?的(标注|笔记)')
 R_MATCH_PAGE = re.compile(u'.*?第 (\d+).*?的(标注|笔记)')
@@ -213,7 +212,8 @@ class KlipModel(object):
         self.c = self.conn.cursor()
         self.__execute__(CLIP_CREATE, True)
         self.__execute__(BOOK_CREATE, True)
-        self.__execute__('''create table  if not exists blacklist as
+        self.__execute__(
+            '''create table  if not exists blacklist as
 select * from clippings limit 0''', True)
 
     def __execute__(self, sql, commit=True):
@@ -280,7 +280,8 @@ select id from blacklist where book = '%s' and content = '%s'
             row = cur.fetchone()
 
             if row is None:
-                self.__execute__('''
+                self.__execute__(
+                    '''
     insert into clippings values (NULL, '%s', '%s', '%s', '%s', '%s')
     ''' % (book, pos, typ, date, clip), False)
                 new_clip = True
@@ -512,7 +513,7 @@ select id from blacklist where book = '%s' and content = '%s'
             query += "where content like ? or book like ?"
             conds = '%' + '%'.join(args) + '%'
 
-            cursor = self.conn.execute(query,  (conds, conds))
+            cursor = self.conn.execute(query, (conds, conds))
         else:
             raise Exception("Expecting a list, but got: %s." % type(args))
 
@@ -529,10 +530,22 @@ select id from blacklist where book = '%s' and content = '%s'
         text = handleStr(text)
 
         if clip.content == text:
-            return
+            return False
 
-        SQL=''' update clippings set content = '?' where ID = ? '''.format (
+        SQL = ''' update clippings set content = '%s' where ID = %d ''' % (
             text, clip.id)
+        self.conn.execute(SQL)
+        clip.content = text
+
+        return True
+
+    def dropClip(self, clip):
+        """Move specified clip into blacklist.
+        """
+        SQL = ''' insert into blacklist select * from clippings where ID = %d''' % clip.id
+        self.conn.execute(SQL)
+
+        SQL = '''delete from clippings where ID = %d''' % clip.id
         self.conn.execute(SQL)
 
         pass
