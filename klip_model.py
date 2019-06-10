@@ -408,9 +408,11 @@ select id from blacklist where book = '%s' and content = '%s'
         clips = {}  # pos - (id, content)
         dup_id = []  # array of cons, where cdr should be dropped...
 
-        # TODO: check if position overlaps....
         iter = self.getClipsByName(book)
+        total_clips = 0
         while iter.next():
+            total_clips += 1
+
             id = iter.id
             pos = iter.pos
 
@@ -469,6 +471,11 @@ select id from blacklist where book = '%s' and content = '%s'
 
                 self.__cleanClipsById__(ids)
                 ret += len(dup_id)
+
+        if total_clips == 0:
+            sql = '''delete from books where name = '%s' ''' % book
+            self.conn.execute(sql)
+            ret += 1
 
         return ret
 

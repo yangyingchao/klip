@@ -2,9 +2,53 @@
 # -*- coding: utf-8 -*-
 
 import wx
+import wx.html2
 import wx.lib.mixins.listctrl as listmix
-from wx.lib.expando import ExpandoTextCtrl, EVT_ETC_LAYOUT_NEEDED
+import markdown
+import os
+
 from klip_common import getClipPath, PDEBUG
+
+scriptdir = os.path.dirname(os.path.realpath(__file__))
+MARKDOWN_CSS = os.path.join(scriptdir, 'styles/markdown.css')
+PYGMENTS_CSS = os.path.join(scriptdir, 'styles/pygments.css')
+
+
+class MarkdownDoc:
+    def __init__(self, markdown_css=MARKDOWN_CSS, pygments_css=PYGMENTS_CSS):
+
+        self.inline_css = ''
+
+        if markdown_css:
+            with open(markdown_css) as markdown_css_file:
+                self.inline_css += markdown_css_file.read()
+
+        if pygments_css:
+            with open(pygments_css) as pygments_css_file:
+                self.inline_css += pygments_css_file.read()
+
+        self.md = markdown.Markdown()
+
+    def getHtml(self, text):
+        self.md.reset()
+        return self.md.convert(text)
+
+    def getHtmlPage(self, text):
+        return """<!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style type="text/css">
+        %s
+        </style>
+        </head>
+        <body>
+        <div class="markdown-body">
+        %s
+        </div>
+        </body>
+        </html>
+        """ % (self.inline_css, self.getHtml(text))
 
 
 class KlipListCtrl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
@@ -26,20 +70,26 @@ class KlipDetailWindow(wx.PopupWindow):
         wx.PopupWindow.__init__(self, parent, style)
 
         self.parent = parent
-        self.eom = ExpandoTextCtrl(
-            self, size=(600, -1), value="This control will expand as you type")
-
-        self.eom.SetMaxHeight(600)
-        self.Bind(EVT_ETC_LAYOUT_NEEDED, self.OnRefit, self.eom)
-
-        font = self.eom.GetFont()
-        font.PointSize += 5
-        self.eom.SetFont(font)
-
         self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.hbox = wx.BoxSizer(wx.HORIZONTAL)
+        self.is_editing = False
 
-        self.sizer.Add(self.eom, 1, wx.EXPAND | wx.ALL, 10)
+        self.editor = wx.TextCtrl(self, size=(450, -1), style=wx.TE_MULTILINE)
 
+        self.Bind(wx.EVT_TEXT, self.OnTextChange, self.editor)
+
+        font = self.editor.GetFont()
+        font.PointSize += 5
+        self.editor.SetFont(font)
+        self.editor.Show(False)
+        self.hbox.Add(self.editor, 1, wx.EXPAND | wx.ALL, 10)
+
+        self.md_converter = MarkdownDoc()
+        self.browser = wx.html2.WebView.New(self)
+        self.browser.SetMinSize(wx.Size(800, 400))
+        self.hbox.Add(self.browser, 1, wx.EXPAND | wx.ALL, 10)
+
+        self.sizer.Add(self.hbox, 1, wx.EXPAND | wx.ALL, 10)
         # type
         row = wx.BoxSizer(wx.HORIZONTAL)
         row.Add(wx.StaticText(self, -1, "type     "), 0, wx.LEFT | wx.RIGHT,
@@ -73,70 +123,103 @@ class KlipDetailWindow(wx.PopupWindow):
         # done button
         row = wx.BoxSizer(wx.HORIZONTAL)
 
-        btn_done = wx.Button(self, -1, 'Done')
-        row.Add(btn_done, 0, wx.ALL, 10)
-        btn_done.Bind(wx.EVT_BUTTON, self.OnDone)
+        self.btn_done = wx.Button(self, -1, 'Done')
+        row.Add(self.btn_done, 0, wx.ALL, 10)
+        self.btn_done.Bind(wx.EVT_BUTTON, self.OnDone)
 
-        btn_delete = wx.Button(self, -1, 'Delete')
-        row.Add(btn_delete, 0, wx.ALL, 10)
-        btn_delete.Bind(wx.EVT_BUTTON, self.OnDelete)
+        self.btn_edit = wx.Button(self, -1, 'Edit')
+        row.Add(self.btn_edit, 0, wx.ALL, 10)
+        self.btn_edit.Bind(wx.EVT_BUTTON, self.OnEdit)
+
+        self.btn_new = wx.Button(self, -1, 'New')
+        row.Add(self.btn_new, 0, wx.ALL, 10)
+        self.btn_new.Bind(wx.EVT_BUTTON, self.OnNew)
+
+        self.btn_delete = wx.Button(self, -1, 'Delete')
+        row.Add(self.btn_delete, 0, wx.ALL, 10)
+        self.btn_delete.Bind(wx.EVT_BUTTON, self.OnDelete)
 
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, 0)
         self.SetSizerAndFit(self.sizer)
 
-    def OnRefit(self, evt):
-        # The Expando control will redo the layout of the
-        # sizer it belongs to, but sometimes this may not be
-        # enough, so it will send us this event so we can do any
-        # other layout adjustments needed.  In this case we'll
-        # just resize the frame to fit the new needs of the sizer.
-        self.Fit()
+    def OnTextChange(self, evt):
+        text = self.editor.GetValue()
+        html = self.md_converter.getHtmlPage(text)
+        self.browser.SetPage(html, '')
+        pass
+
+    def Restore(self):
+        """
+        """
+        self.editor.Show(False)
+        self.browser.SetSize(wx.Size(800, 400))
+        self.browser.SetMinSize(wx.Size(800, 400))
+
+        self.is_editing = False
+
+        self.btn_delete.SetLabel("Delete")
+        self.btn_edit.Enable(True)
+        self.btn_new.Enable(True)
+
+        self.Show(False)
         pass
 
     def OnDone(self, evt):
         """Hide this window..
         """
-        PDEBUG('K: %s', evt)
-        self.Show(False)
-        text = self.eom.GetValue()
-        self.parent.updateClip(self._clip, text)
-        pass
+        if self.is_editing:
+            self.editor.Show(False)
+            text = self.editor.GetValue()
+            self.parent.updateClip(self._clip, text)
 
+        self.Restore()
+
+    def OnEdit(self, evt):
+        """Edit selected clip.
+        """
+
+        if self.is_editing:
+            return
+
+        self.is_editing = True
+
+        self.btn_edit.Enable(False)
+        self.btn_new.Enable(False)
+
+        self.btn_delete.SetLabel("Cancel")
+
+        self.editor.Show(True)
+
+        self.editor.SetSize(wx.Size(400, 400))
+        self.browser.SetSize(wx.Size(400, 400))
+        self.browser.SetMinSize(wx.Size(400, 400))
+
+        self.Refresh()
+        self.Update()
+        self.Fit()
+
+    def OnNew(self, evt):
+        """Create new clip...
+        """
+        pass
 
     def OnDelete(self, evt):
         """Hide this window..
         """
-        PDEBUG('K: %s', evt)
+        if self.is_editing:  # label should be "Cancel"
+            self.Restore()
+        else:
+            self.parent.dropClip(self._clip)
+
         self.Show(False)
-        self.parent.dropClip(self._clip)
-        pass
-
-
-    def OnMouseLeftDown(self, evt):
-        self.Refresh()
-        self.ldPos = evt.GetEventObject().ClientToScreen(evt.GetPosition())
-        self.wPos = self.ClientToScreen((0, 0))
-        self.pnl.CaptureMouse()
-
-    def OnMouseMotion(self, evt):
-        if evt.Dragging() and evt.LeftIsDown():
-            dPos = evt.GetEventObject().ClientToScreen(evt.GetPosition())
-            nPos = (self.wPos.x + (dPos.x - self.ldPos.x),
-                    self.wPos.y + (dPos.y - self.ldPos.y))
-            self.Move(nPos)
-
-    def OnMouseLeftUp(self, evt):
-        if self.pnl.HasCapture():
-            self.pnl.ReleaseMouse()
-
-    def OnRightUp(self, evt):
-        self.Show(False)
-        wx.CallAfter(self.Destroy)
 
     def UpdateContent(self, clip):
         self._clip = clip
         PDEBUG('POS: %s, DATE: %s', clip.pos, clip.date)
-        self.eom.SetValue(clip.content)
+        self.editor.SetValue(clip.content)
+
+        html = self.md_converter.getHtmlPage(clip.content)
+        self.browser.SetPage(html, '')
 
         self.st_type.SetLabel(clip.typ)
         self.st_date.SetLabel(clip.date)
@@ -144,6 +227,7 @@ class KlipDetailWindow(wx.PopupWindow):
 
         self.Layout()
         self.sizer.Fit(self)
+
         pass
 
 
@@ -395,7 +479,7 @@ class KlipFrame(wx.Frame):
             item = wx.ListItem()
             item.SetData(it.id)
             item.SetId(idx)
-            item.SetText(u"    %s\n" % (it.content))
+            item.SetText(u"    %s" % (it.content))
             self.clip_list.InsertItem(item)
             idx += 1
 
@@ -424,7 +508,7 @@ class KlipFrame(wx.Frame):
     def dropClip(self, clip):
         if self.model.dropClip(clip):
             # update clip_list
-            pass # TODO: refresh clip list.
+            pass  # TODO: refresh clip list.
         pass
 
 

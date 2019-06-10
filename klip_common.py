@@ -21,6 +21,7 @@ def getClipPath():
 
     return os.path.join(os.path.dirname(__file__), "My Clippings.txt")
 
+
 def myhash(value):
     """
 
@@ -29,7 +30,9 @@ def myhash(value):
     """
     return hash(value) % ((sys.maxsize + 1) * 2)
 
+
 debug_mode = True
+
 
 # import  traceback
 def PDEBUG(fmt, *args):
@@ -41,8 +44,10 @@ def PDEBUG(fmt, *args):
 
     stack = traceback.extract_stack(None, 2)[0]
     try:
-        msg = fmt%args
+        msg = fmt % args
     except:
         msg = "Failed to format string.."
     finally:
-        print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], msg))
+        print("DEBUG - (%s:%d -- %s): %s" %
+              (stack[0], stack[1], stack[2], msg))
+

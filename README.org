@@ -11,8 +11,19 @@
 #+CATEGORY: (nil)
 #+DESCRIPTION: (nil)
 
+* Introduction
+:PROPERTIES:
+:CUSTOM_ID: h:B6E4A0DB-90B5-4ABB-846D-1ACAFADBFAA6
+:END:
 Simple tool to view clippings of Kindle.
 
 Note:
- - wxPython is needed to use GUI, it could be installed via: pip3 install wxPython.
- - command line version does not need wxPython.
+ - wxPython is required to use GUI, it could be installed via: =pip3 install wxPython=.
+ - markdown is required for displaying clippings pretty: =pip3 install markdown=
+ - command line version does not need wxPython or markdown.
+
+* TODO
+:PROPERTIES:
+:CUSTOM_ID: h:49672FA2-EB1A-4EA1-8F53-6B5F5426F168
+:END:
+- [ ] Refresh clips when edit/delete clips is done..
