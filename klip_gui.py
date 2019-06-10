@@ -210,8 +210,7 @@ class KlipDetailWindow(wx.PopupWindow):
             self.editor.Show(False)
             self.parent.updateClip(self._clip, text)
         elif self.state == State.Creating:
-            self.parent.newClip(text,
-                                self.st_type.GetLabel(),
+            self.parent.newClip(text, self.st_type.GetLabel(),
                                 self.st_date.GetLabel())
             pass
 
@@ -366,8 +365,6 @@ class KlipFrame(wx.Frame):
                   self.clip_list)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnClipSelected,
                   self.clip_list)
-
-
 
         pnl_clips.SetSizer(sizer)
 
@@ -632,8 +629,6 @@ class KlipFrame(wx.Frame):
 
         self._cur_item = event.GetItem()
         id = self._cur_item.GetData()
-        txt = self._cur_item.GetText()
-        PDEBUG('ID: %d -- %s', id, txt)
         clip = self.model.getClipById(id)
         self.detailPanel.UpdateContent(clip)
 
@@ -643,12 +638,8 @@ class KlipFrame(wx.Frame):
         pass
 
     def updateClip(self, clip, text):
-        if self.model.updateClip(clip, text):
-            # update clip_list
-            pass
-        self._cur_item.SetText(clip.content)
-        self.Refresh()
-
+        self.model.updateClip(clip, text)
+        self.clip_list.SetItemText(self._cur_item.GetId(), u"    %s" % text)
         pass
 
     def dropClip(self, clip):
@@ -661,7 +652,7 @@ class KlipFrame(wx.Frame):
         # current book...
         if self.clip_list.GetItemCount() == 0:
             dlg = GMD.GenericMessageDialog(
-                self, 'No clips in book %s, remove this book?', "CONFIRM",
+                self, 'No clips in book %s, remove this book?'%self._book, "CONFIRM",
                 wx.OK | wx.CANCEL | wx.ICON_INFORMATION)
             val = dlg.ShowModal()
             dlg.Destroy()
