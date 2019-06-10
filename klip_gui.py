@@ -10,6 +10,11 @@ from enum import Enum
 from datetime import datetime
 from klip_common import getClipPath, PDEBUG
 
+try:
+    from agw import genericmessagedialog as GMD
+except ImportError:  # if it's not there locally, try the wxPython lib.
+    import wx.lib.agw.genericmessagedialog as GMD
+
 scriptdir = os.path.dirname(os.path.realpath(__file__))
 MARKDOWN_CSS = os.path.join(scriptdir, 'styles/markdown.css')
 PYGMENTS_CSS = os.path.join(scriptdir, 'styles/pygments.css')
@@ -196,15 +201,18 @@ class KlipDetailWindow(wx.PopupWindow):
     def OnDone(self, evt):
         """Hide this window..
         """
+        text = self.editor.GetValue().strip()
+        if len(text) == 0:
+            self.Restore()
+            return
+
         if self.state == State.Editting:
             self.editor.Show(False)
-            text = self.editor.GetValue()
             self.parent.updateClip(self._clip, text)
         elif self.state == State.Creating:
-            self.parent.newClip(
-                self.editor.GetValue(),
-                self.st_type.GetLabel(),
-                self.st_date.GetLabel())
+            self.parent.newClip(text,
+                                self.st_type.GetLabel(),
+                                self.st_date.GetLabel())
             pass
 
         self.Restore()
@@ -241,9 +249,8 @@ class KlipDetailWindow(wx.PopupWindow):
         if self.state == State.Editting:  # label should be "Cancel"
             self.Restore()
         else:
+            self.Show(False)
             self.parent.dropClip(self._clip)
-
-        self.Show(False)
 
     def UpdateContent(self, clip):
         self._clip = clip
@@ -272,6 +279,7 @@ class KlipFrame(wx.Frame):
         """
         self.model = model_
         self._book = None
+        self._book_id = None
         self._search_target = None
 
         super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760))
@@ -315,6 +323,8 @@ class KlipFrame(wx.Frame):
         # font = font.Bold()
         self.book_list.SetFont(font)
         self.book_list.SetForegroundColour(wx.Colour(0x43, 0x43, 0x43))
+        self.book_list.ClearAll()
+        self.book_list.SetBackgroundColour(wx.Colour(0xf6, 0xf6, 0xf6))
 
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnBookSelected,
                   self.book_list)
@@ -348,12 +358,16 @@ class KlipFrame(wx.Frame):
 
         self.clip_list.InsertColumn(0, "Clip")
 
-        books = self.fillBooks()
+        # books = self.fillBooks()
 
         sizer.Add(self.clip_list, 1, wx.EXPAND | wx.ALL, 0)
 
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.showClipDetail,
                   self.clip_list)
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnClipSelected,
+                  self.clip_list)
+
+
 
         pnl_clips.SetSizer(sizer)
 
@@ -365,11 +379,13 @@ class KlipFrame(wx.Frame):
         PDEBUG('Update Column Width: %d' % width)
         self.clip_list.SetColumnWidth(0, width)
 
+        self.clip_list.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK,
+                            self.OnRightClickClips)
+
+        self.refreshContents()
+
         # create a menu bar
         self.makeMenuBar()
-
-        if books > 0:
-            self.book_list.Select(0)
 
     def makeMenuBar(self):
         """
@@ -424,6 +440,22 @@ class KlipFrame(wx.Frame):
         if total > 0:
             pass  # Add dialog??
 
+        self.refreshContents()
+
+    def refreshContents(self):
+        """
+        """
+        self.fillBooks()
+        total_books = self.book_list.GetItemCount()
+        PDEBUG('BOOK_ID: %s, total: %s', self._book_id, total_books)
+        if self._book_id is None:
+            self.book_list.Select(0)
+        elif self._book_id >= total_books:
+            self.book_list.Select(total_books - 1)
+        else:
+            self.book_list.Select(self._book_id)
+        pass
+
     def OnLoadFile(self, event):
         """Load clips from file.."""
 
@@ -460,8 +492,7 @@ class KlipFrame(wx.Frame):
         """Fill book list.
         """
 
-        self.book_list.ClearAll()
-        self.book_list.SetBackgroundColour(wx.Colour(0xf6, 0xf6, 0xf6))
+        self.book_list.DeleteAllItems()
 
         self.book_list.InsertColumn(0, "Book")
         # 0 will insert at the start of the list
@@ -469,7 +500,11 @@ class KlipFrame(wx.Frame):
         iter = self.model.getBooks()
         idx = 0
         while iter.next():
-            self.book_list.InsertItem(idx, u"   %s" % (iter.book))
+            item = wx.ListItem()
+            item.SetData(iter.id)
+            item.SetId(idx)
+            item.SetText(u"    %s" % (iter.book))
+            self.book_list.InsertItem(item)
             idx += 1
 
         width = self.book_list.GetSize().GetWidth() * 0.5
@@ -481,8 +516,84 @@ class KlipFrame(wx.Frame):
         """
         """
         book = event.GetText().strip()
-
+        self._book_id = event.GetItem().GetId()
+        PDEBUG('BOOK_ID: %d', self._book_id)
         self.showClipsOfBook(book)
+        self._clip = None
+        pass
+
+    def OnClipSelected(self, event):
+        self._cur_item = event.GetItem()
+        id = self._cur_item.GetData()
+        txt = self._cur_item.GetText()
+        PDEBUG('ID: %d -- %s', id, txt)
+        self._clip = self.model.getClipById(id)
+        PDEBUG('CLIP: %s', self._clip)
+        pass
+
+    def OnRightClickClips(self, evt):
+        """
+        """
+        PDEBUG('enter: %s', evt)
+
+        # only do this part the first time so the events are only bound once
+        if not hasattr(self, "popupID1"):
+            self.popupID1 = wx.NewIdRef()
+            self.popupID2 = wx.NewIdRef()
+            self.popupID3 = wx.NewIdRef()
+            self.popupID4 = wx.NewIdRef()
+            self.popupID5 = wx.NewIdRef()
+            self.popupID6 = wx.NewIdRef()
+
+            self.Bind(wx.EVT_MENU, self.OnNew, id=self.popupID1)
+            self.Bind(wx.EVT_MENU, self.OnEdit, id=self.popupID2)
+            self.Bind(wx.EVT_MENU, self.OnDelete, id=self.popupID3)
+            self.Bind(wx.EVT_MENU, self.OnDeleteAll, id=self.popupID4)
+
+        # make a menu
+        menu = wx.Menu()
+        # add some items
+        menu.Append(self.popupID1, "New Clip")
+        menu.Append(self.popupID2, "Edit Selected")
+        menu.Append(self.popupID3, "Delete Selected")
+        menu.Append(self.popupID4, "DeleteAllItems")
+
+        # Popup the menu.  If an item is selected then its handler
+        # will be called before PopupMenu returns.
+        self.PopupMenu(menu)
+
+        menu.Destroy()
+
+        pass
+
+    def OnNew(self, evt):
+        """
+        """
+        self.detailPanel.Show(True)
+        self.detailPanel.OnNew(evt)
+        pass
+
+    def OnEdit(self, evt):
+        """
+        """
+        PDEBUG('NOT IMPLEMENT.')
+        self.detailPanel.Show(True)
+        self.detailPanel.OnNew(evt)
+
+        pass
+
+    def OnDelete(self, evt):
+        PDEBUG('NOT IMPLEMENT.')
+        if self._clip is None:
+            PDEBUG('oops')
+
+        self.dropClip(self._clip)
+        self._clip = None
+
+    def OnDeleteAll(self, evt):
+        """
+        """
+        PDEBUG('NOT IMPLEMENT.')
         pass
 
     def showClipsOfBook(self, book=None):
@@ -501,7 +612,7 @@ class KlipFrame(wx.Frame):
         pass
 
     def showClips(self, title, it):
-        """Show contents in clip_lis.
+        """Show contents in clip_li.s
         """
         self.book_title.SetLabel("  %s" % title)
         self.clip_list.DeleteAllItems()
@@ -534,17 +645,36 @@ class KlipFrame(wx.Frame):
     def updateClip(self, clip, text):
         if self.model.updateClip(clip, text):
             # update clip_list
-            self._cur_item.SetText(clip.content)
+            pass
+        self._cur_item.SetText(clip.content)
+        self.Refresh()
+
         pass
 
     def dropClip(self, clip):
-        if self.model.dropClip(clip):
-            # update clip_list
-            pass  # TODO: refresh clip list.
+        PDEBUG('DELETE IDX: %d', self._cur_item.GetId())
+        self.model.dropClip(clip)
+        self.clip_list.DeleteItem(self._cur_item.GetId())
+        self.Refresh()
+
+        # If there are no clips left for current book, ask if we should remove
+        # current book...
+        if self.clip_list.GetItemCount() == 0:
+            dlg = GMD.GenericMessageDialog(
+                self, 'No clips in book %s, remove this book?', "CONFIRM",
+                wx.OK | wx.CANCEL | wx.ICON_INFORMATION)
+            val = dlg.ShowModal()
+            dlg.Destroy()
+
+            if val == 5100:
+                self.model.dropBook(self._book)
+                self.refreshContents()
         pass
 
     def newClip(self, content, typ, date):
         self.model.newClip(self._book, content, typ, date)
+        self.showClipsOfBook()
+
         pass
 
 

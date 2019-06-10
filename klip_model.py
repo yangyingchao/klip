@@ -252,17 +252,6 @@ select * from clippings limit 0''', True)
         - `clip`: content of clipping
         """
 
-        cur = self.__execute__('''select id from books where NAME = '%s'
-''' % book)
-
-        row = cur.fetchone()
-        if row is None:
-            new_book = True
-            self.__execute__('''insert into books values (NULL, '%s')
-''' % book)
-        else:
-            new_book = False
-
         cur = self.__execute__('''
 select id from blacklist where book = '%s' and content = '%s'
 ''' % (book, clip))
@@ -287,6 +276,18 @@ select id from blacklist where book = '%s' and content = '%s'
                 new_clip = True
             else:
                 new_clip = False
+
+
+        new_book = False
+        if new_clip:
+            cur = self.__execute__('''select id from books where NAME = '%s'
+    ''' % book)
+
+            row = cur.fetchone()
+            if row is None:
+                new_book = True
+                self.__execute__('''insert into books values (NULL, '%s')
+    ''' % book)
 
         return (new_book, new_clip)
 
@@ -420,6 +421,9 @@ select id from blacklist where book = '%s' and content = '%s'
             if '-' not in pos:
                 continue
 
+            if pos.startswith('-'):
+                continue
+
             pos_array = []
             for p in pos.split('-'):
                 pos_array.append(int(p))
@@ -473,8 +477,7 @@ select id from blacklist where book = '%s' and content = '%s'
                 ret += len(dup_id)
 
         if total_clips == 0:
-            sql = '''delete from books where name = '%s' ''' % book
-            self.conn.execute(sql)
+            self.dropBook(book)
             ret += 1
 
         return ret
@@ -484,6 +487,11 @@ select id from blacklist where book = '%s' and content = '%s'
         """
         cur = self.conn.execute('''select ID, NAME from books;''')
         return BookIter(cur)
+
+    def dropBook(self, book):
+        sql = '''delete from books where name = '%s' ''' % book
+        self.conn.execute(sql)
+        pass
 
     def getBooksById(self, id):
         """Return iterator of books.
@@ -550,9 +558,11 @@ select id from blacklist where book = '%s' and content = '%s'
         """Move specified clip into blacklist.
         """
         SQL = ''' insert into blacklist select * from clippings where ID = %d''' % clip.id
+        PDEBUG('SQL: %s', SQL)
         self.conn.execute(SQL)
 
         SQL = '''delete from clippings where ID = %d''' % clip.id
+        PDEBUG('SQL: %s', SQL)
         self.conn.execute(SQL)
 
         pass
@@ -562,7 +572,7 @@ select id from blacklist where book = '%s' and content = '%s'
         Add a new clip into database.
         """
         sql='''    insert into clippings values (NULL, '%s', '%s', '%s', '%s', '%s')
-''' %(book, '-1', typ, date, content)
+''' %(book, '0', typ, date, content)
 
         self.__execute__(sql)
         pass
