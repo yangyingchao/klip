@@ -6,7 +6,8 @@ import wx.html2
 import wx.lib.mixins.listctrl as listmix
 import markdown
 import os
-
+from enum import Enum
+from datetime import datetime
 from klip_common import getClipPath, PDEBUG
 
 scriptdir = os.path.dirname(os.path.realpath(__file__))
@@ -62,6 +63,14 @@ class KlipListCtrl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
         listmix.ListCtrlAutoWidthMixin.__init__(self)
 
 
+class State(Enum):
+    """State of detail window.
+    """
+    Initial = 0,
+    Editting = 1,
+    Creating = 2
+
+
 class KlipDetailWindow(wx.PopupWindow):
     """Adds a bit of text and mouse movement to the wx.PopupWindow"""
 
@@ -72,7 +81,7 @@ class KlipDetailWindow(wx.PopupWindow):
         self.parent = parent
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.hbox = wx.BoxSizer(wx.HORIZONTAL)
-        self.is_editing = False
+        self.state = State.Initial
 
         self.editor = wx.TextCtrl(self, size=(450, -1), style=wx.TE_MULTILINE)
 
@@ -155,7 +164,7 @@ class KlipDetailWindow(wx.PopupWindow):
         self.browser.SetSize(wx.Size(800, 400))
         self.browser.SetMinSize(wx.Size(800, 400))
 
-        self.is_editing = False
+        self.state = State.Initial
 
         self.btn_delete.SetLabel("Delete")
         self.btn_edit.Enable(True)
@@ -164,25 +173,9 @@ class KlipDetailWindow(wx.PopupWindow):
         self.Show(False)
         pass
 
-    def OnDone(self, evt):
-        """Hide this window..
+    def SetupEditor(self):
         """
-        if self.is_editing:
-            self.editor.Show(False)
-            text = self.editor.GetValue()
-            self.parent.updateClip(self._clip, text)
-
-        self.Restore()
-
-    def OnEdit(self, evt):
-        """Edit selected clip.
         """
-
-        if self.is_editing:
-            return
-
-        self.is_editing = True
-
         self.btn_edit.Enable(False)
         self.btn_new.Enable(False)
 
@@ -198,15 +191,54 @@ class KlipDetailWindow(wx.PopupWindow):
         self.Update()
         self.Fit()
 
+        pass
+
+    def OnDone(self, evt):
+        """Hide this window..
+        """
+        if self.state == State.Editting:
+            self.editor.Show(False)
+            text = self.editor.GetValue()
+            self.parent.updateClip(self._clip, text)
+        elif self.state == State.Creating:
+            self.parent.newClip(
+                self.editor.GetValue(),
+                self.st_type.GetLabel(),
+                self.st_date.GetLabel())
+            pass
+
+        self.Restore()
+
+    def OnEdit(self, evt):
+        """Edit selected clip.
+        """
+
+        if self.state == State.Editting:
+            return
+
+        self.state = State.Editting
+        self.SetupEditor()
+
     def OnNew(self, evt):
         """Create new clip...
         """
+        self.state = State.Creating
+
+        self.editor.SetValue('')
+        html = self.md_converter.getHtmlPage('')
+        self.browser.SetPage(html, '')
+
+        self.st_type.SetLabel(u'笔记')
+        self.st_date.SetLabel(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        self.st_location.SetLabel(u'未知')
+
+        self.SetupEditor()
         pass
 
     def OnDelete(self, evt):
         """Hide this window..
         """
-        if self.is_editing:  # label should be "Cancel"
+        if self.state == State.Editting:  # label should be "Cancel"
             self.Restore()
         else:
             self.parent.dropClip(self._clip)
@@ -509,6 +541,10 @@ class KlipFrame(wx.Frame):
         if self.model.dropClip(clip):
             # update clip_list
             pass  # TODO: refresh clip list.
+        pass
+
+    def newClip(self, content, typ, date):
+        self.model.newClip(self._book, content, typ, date)
         pass
 
 

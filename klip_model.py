@@ -556,3 +556,13 @@ select id from blacklist where book = '%s' and content = '%s'
         self.conn.execute(SQL)
 
         pass
+
+    def newClip(self, book, content, typ, date):
+        """
+        Add a new clip into database.
+        """
+        sql='''    insert into clippings values (NULL, '%s', '%s', '%s', '%s', '%s')
+''' %(book, '-1', typ, date, content)
+
+        self.__execute__(sql)
+        pass
