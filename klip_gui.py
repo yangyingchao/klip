@@ -643,10 +643,15 @@ class KlipFrame(wx.Frame):
         pass
 
     def dropClip(self, clip):
-        PDEBUG('DELETE IDX: %d', self._cur_item.GetId())
+        idx = self._cur_item.GetId()
+        PDEBUG('DELETE IDX: %d', idx)
         self.model.dropClip(clip)
-        self.clip_list.DeleteItem(self._cur_item.GetId())
+        self.clip_list.DeleteItem(idx)
+        if idx < self.clip_list.GetItemCount():
+            self.clip_list.Select(idx)
+
         self.Refresh()
+        self.clip_list.SetFocus()
 
         # If there are no clips left for current book, ask if we should remove
         # current book...

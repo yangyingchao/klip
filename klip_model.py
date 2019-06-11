@@ -85,19 +85,17 @@ def getDBPath(readonly=False):
     return path
 
 
-CLIP_TABLE = 'clippings'
-
 CLIP_CREATE = '''
-create table if not exists %s
+create table if not exists clippings
     (
       ID INTEGER PRIMARY KEY  AUTOINCREMENT,
       BOOK TEXT,
       POS TEXT,
-TYPE TEXT,
-DATE TEXT,
+      TYPE TEXT,
+      DATE TEXT,
       CONTENT TEXT
     );
-''' % CLIP_TABLE
+'''
 
 BOOK_TABLE = 'books'
 BOOK_CREATE = '''
@@ -212,6 +210,8 @@ class KlipModel(object):
         self.c = self.conn.cursor()
         self.__execute__(CLIP_CREATE, True)
         self.__execute__(BOOK_CREATE, True)
+
+        # Things in blacklist: bad or incomplete records.
         self.__execute__(
             '''create table  if not exists blacklist as
 select * from clippings limit 0''', True)
@@ -252,9 +252,13 @@ select * from clippings limit 0''', True)
         - `clip`: content of clipping
         """
 
+        # TODO: Position (range) is checked to decide if contents exists or not.
+        #       Similarity of contents should be checked too...
+
+        # check if record is in blacklist.
         cur = self.__execute__('''
-select id from blacklist where book = '%s' and content = '%s'
-''' % (book, clip))
+select id from blacklist where book = '%s' and pos = '%s'
+''' % (book, pos))
 
         row = cur.fetchone()
 
@@ -263,8 +267,8 @@ select id from blacklist where book = '%s' and content = '%s'
             new_clip = False
         else:
             cur = self.__execute__('''
-    select id from clippings where book = '%s' and content = '%s'
-    ''' % (book, clip))
+    select id from clippings where book = '%s' and pos = '%s'
+    ''' % (book, pos))
 
             row = cur.fetchone()
 
@@ -276,7 +280,6 @@ select id from blacklist where book = '%s' and content = '%s'
                 new_clip = True
             else:
                 new_clip = False
-
 
         new_book = False
         if new_clip:
@@ -571,8 +574,8 @@ select id from blacklist where book = '%s' and content = '%s'
         """
         Add a new clip into database.
         """
-        sql='''    insert into clippings values (NULL, '%s', '%s', '%s', '%s', '%s')
-''' %(book, '0', typ, date, content)
+        sql = '''    insert into clippings values (NULL, '%s', '%s', '%s', '%s', '%s')
+''' % (book, '0', typ, date, content)
 
         self.__execute__(sql)
         pass
