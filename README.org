@@ -20,7 +20,7 @@ Note:
  - markdown is required for displaying clippings pretty: =pip3 install markdown=
  - command line version does not need wxPython or markdown.
 
-* TODO
+* List of TODOs
 - [X] Refresh clips when edit/delete clips is done..
 - [ ] Parse and show author.
 - [ ] Show dialog to choose source when default myclippings.txt can't be located.
