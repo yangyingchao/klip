@@ -12,9 +12,7 @@
 #+DESCRIPTION: (nil)
 
 * Introduction
-:PROPERTIES:
-:CUSTOM_ID: h:B6E4A0DB-90B5-4ABB-846D-1ACAFADBFAA6
-:END:
+
 Simple tool to view clippings of Kindle.
 
 Note:
@@ -23,7 +21,10 @@ Note:
  - command line version does not need wxPython or markdown.
 
 * TODO
-:PROPERTIES:
-:CUSTOM_ID: h:49672FA2-EB1A-4EA1-8F53-6B5F5426F168
-:END:
-- [ ] Refresh clips when edit/delete clips is done..
+- [X] Refresh clips when edit/delete clips is done..
+- [ ] Parse and show author.
+- [ ] Show dialog to choose source when default myclippings.txt can't be located.
+- [ ] Update clippings table: change author & book name into ID, instead of text...
+- [ ] Add header to refresh/cleanup/search in left panel.
+- [ ] Add header to right panel to show author & number total clips..
+  [[./images/Screen Shot 2019-06-16 at 8.11.10 AM.png]]

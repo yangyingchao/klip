@@ -347,8 +347,17 @@ class KlipFrame(wx.Frame):
         font.Bold()
         self.book_title.SetFont(font)
         self.book_title.SetForegroundColour(wx.Colour(0x25, 0x91, 0xff))
+        sizer.Add(self.book_title, 0, wx.EXPAND, 10)
 
-        sizer.Add(self.book_title, 0, wx.EXPAND, 0)
+        self.book_info = wx.StaticText(pnl_clips, label='')
+
+        font = self.book_info.GetFont()
+        font.PointSize += 5
+        font.Bold()
+        self.book_info.SetFont(font)
+        # self.book_info.SetForegroundColour(wx.Colour(0x25, 0x91, 0xff))
+
+        sizer.Add(self.book_info, 0, wx.EXPAND, 10)
 
         self.clip_list = KlipListCtrl(pnl_clips,
                                       wx.ID_ANY,
@@ -622,6 +631,8 @@ class KlipFrame(wx.Frame):
             item.SetText(u"    %s" % (it.content))
             self.clip_list.InsertItem(item)
             idx += 1
+
+        self.book_info.SetLabel('      Total clips: %d' % idx)
 
         pass
 
