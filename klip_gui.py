@@ -325,6 +325,8 @@ class KlipFrame(wx.Frame):
         self.book_list.ClearAll()
         self.book_list.SetBackgroundColour(wx.Colour(0xf6, 0xf6, 0xf6))
 
+        self.bl_width = self.book_list.GetSize().GetWidth() * 0.5
+
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnBookSelected,
                   self.book_list)
 
@@ -513,9 +515,9 @@ class KlipFrame(wx.Frame):
             self.book_list.InsertItem(item)
             idx += 1
 
-        # width = self.book_list.GetSize().GetWidth() * 0.5
-        # self.book_list.SetColumnWidth(0, width)
         self._total_books.SetLabel('BOOKS (%d)' % idx)
+        self.book_list.SetColumnWidth(0, self.bl_width)
+
         return idx
 
     def OnBookSelected(self, event):
