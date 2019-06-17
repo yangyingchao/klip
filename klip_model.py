@@ -10,11 +10,13 @@ import codecs
 
 PAGE_SIZE = 4096
 
-R_MATCH_ENTRY = re.compile(u'^(.*?)\n- (.*?) \\| (.*?)\n(.*?)\n==========',
+R_MATCH_ENTRY = re.compile(u'^(.*?)\n- (.*?) \\| .*? (.*?)\n(.*?)\n==========',
                            re.DOTALL | re.MULTILINE)
 
 R_MATCH_POS = re.compile(u'.*?位置 #(\d+(?:-\d+)?).*?的(标注|笔记)')
 R_MATCH_PAGE = re.compile(u'.*?第 (\d+).*?的(标注|笔记)')
+
+KLIP_DATA_VERSION = 1
 
 
 def handleStr(ins):
@@ -36,7 +38,7 @@ def handleStr(ins):
 
 boms = [codecs.BOM_UTF8]
 reps = [('（', '('), ('）', ')'), ('（', '('), ('）', ')')]
-r_match_book = re.compile('(.*?)\(.*?\)', re.DOTALL)
+r_match_book = re.compile('(.*?)\((.*?)\)', re.DOTALL)
 
 
 def process_book_name(name):
@@ -59,12 +61,14 @@ def process_book_name(name):
 
     # merge multiple white spaces
     name = ' '.join(name.strip().split())
+    author = ''
 
     m = r_match_book.match(name)
     if m:
         name = m.group(1)
+        author = m.group(2)
 
-    return name.strip()
+    return (name.strip(), author.strip())
 
 
 def getDBPath(readonly=False):
@@ -85,11 +89,11 @@ def getDBPath(readonly=False):
     return path
 
 
-CLIP_CREATE = '''
+SQL_CREATE_CLIPS = '''
 create table if not exists clippings
     (
       ID INTEGER PRIMARY KEY  AUTOINCREMENT,
-      BOOK TEXT,
+      BOOK ID,
       POS TEXT,
       TYPE TEXT,
       DATE TEXT,
@@ -98,16 +102,14 @@ create table if not exists clippings
 '''
 
 BOOK_TABLE = 'books'
-BOOK_CREATE = '''
+SQL_CREATE_BOOKS = '''
 create table if not exists %s
 (
       ID INTEGER PRIMARY KEY AUTOINCREMENT,
-      NAME TEXT
+      NAME TEXT,
+      AUTHOR TEXT
 )
 ''' % BOOK_TABLE
-BOOK_INSERT_FMT = 'insert into %s values ' % BOOK_TABLE + \
-    '''(%u, '%s');'''
-QUERY_BOOK_FMT = "select id, book from %s where ID = " % BOOK_TABLE + "%u"
 
 
 class BookIter(object):
@@ -118,7 +120,8 @@ class BookIter(object):
         self._cursor = cursor
         super(BookIter, self).__init__()
         self.id = None
-        self.book = None
+        self.name = None
+        self.author = None
 
     def next(self):
         """Return next book of format (ID, NAME), or None if no books
@@ -126,7 +129,8 @@ class BookIter(object):
         res = self._cursor.fetchone()
         if res:
             self.id = res[0]
-            self.book = res[1]
+            self.name = res[1]
+            self.author = res[2]
             return True
 
         return False
@@ -197,7 +201,7 @@ class KlipModel(object):
         super(KlipModel, self).__init__()
 
         self.conn = None
-        self.c = None
+        self._book_cache = {}
 
         # trial is used to make lsp happy...
         if trial:
@@ -207,21 +211,40 @@ class KlipModel(object):
 
     def __open__(self):
         self.conn = sqlite3.connect(getDBPath(False))
-        self.c = self.conn.cursor()
-        self.__execute__(CLIP_CREATE, True)
-        self.__execute__(BOOK_CREATE, True)
 
-        # Things in blacklist: bad or incomplete records.
         self.__execute__(
-            '''create table  if not exists blacklist as
+            '''
+create table if not exists version
+(
+        major int
+);
+''', True)
+
+        ans = self.__execute__('select major from version;').fetchone()
+        if ans is None or ans[0] == KLIP_DATA_VERSION:
+            self.__execute__(
+                '''insert into version values (%d)''' % KLIP_DATA_VERSION,
+                True)
+            self.__execute__(SQL_CREATE_CLIPS, True)
+            self.__execute__(SQL_CREATE_BOOKS, True)
+
+            # Things in blacklist: bad or incomplete records.
+            self.__execute__(
+                '''create table  if not exists blacklist as
 select * from clippings limit 0''', True)
+            return
+
+        version = ans[0]
+        print('Upgrade needed, not implemented.. %d -- %d' %
+              (version, KLIP_DATA_VERSION))
 
     def __execute__(self, sql, commit=True):
         """
         Execute sql, and commit commit if asked.
         """
+        cursor = None
         try:
-            cursor = self.c.execute(sql)
+            cursor = self.conn.execute(sql)
         except sqlite3.IntegrityError as e:
             print('DUP: %s' % e)
         except Exception as e:
@@ -230,7 +253,7 @@ select * from clippings limit 0''', True)
             if commit:
                 self.conn.commit()
 
-        return self.c
+        return cursor
 
     def __del__(self):
         """
@@ -240,7 +263,7 @@ select * from clippings limit 0''', True)
             self.conn.close()
         pass
 
-    def __addEntry__(self, book, pos, typ, date, clip):
+    def __addEntry__(self, book, author, pos, typ, date, clip):
         """Check if book is already in store, and returns a tuple to indicate if
         clip and book are new: (new_book, new_clip).
 
@@ -251,14 +274,38 @@ select * from clippings limit 0''', True)
         - `date`: adding date
         - `clip`: content of clipping
         """
+        new_book = False
+        book_id = self._book_cache.get(book, None)
+
+        if book_id is None:
+            cur = self.__execute__(
+                '''select id, author from books where NAME = '%s' ''' % book)
+            row = cur.fetchone()
+            if row is None:
+                self.__execute__('''insert into books values (NULL, '%s', '%s')  ''' %
+                                 (book, author))
+                cur = self.__execute__(
+                    '''select id, author from books where NAME = '%s' ''' % book)
+                row = cur.fetchone()
+                book_id = row[0]
+                self._book_cache[book] = book_id
+            else:
+                book_id = row[0]
+                self._book_cache[book] = book_id
+
+                if row[1] is None:  # older version does not have AUTHOR field...
+                    # BUG: same title from different authors??
+                    self.__execute__(
+                        '''update books set author = '%s' where id = %d ''' %(
+                        author, book_id))
 
         # TODO: Position (range) is checked to decide if contents exists or not.
         #       Similarity of contents should be checked too...
 
         # check if record is in blacklist.
         cur = self.__execute__('''
-select id from blacklist where book = '%s' and pos = '%s'
-''' % (book, pos))
+select id from blacklist where book_id = '%d' and pos = '%s'
+''' % (book_id, pos))
 
         row = cur.fetchone()
 
@@ -267,30 +314,19 @@ select id from blacklist where book = '%s' and pos = '%s'
             new_clip = False
         else:
             cur = self.__execute__('''
-    select id from clippings where book = '%s' and pos = '%s'
-    ''' % (book, pos))
+    select id from clippings where book_id = %d and pos = '%s'
+    ''' % (book_id, pos))
 
             row = cur.fetchone()
 
             if row is None:
                 self.__execute__(
                     '''
-    insert into clippings values (NULL, '%s', '%s', '%s', '%s', '%s')
-    ''' % (book, pos, typ, date, clip), False)
+    insert into clippings values (NULL, %d, '%s', '%s', '%s', '%s')
+    ''' % (book_id, pos, typ, date, clip), False)
                 new_clip = True
             else:
                 new_clip = False
-
-        new_book = False
-        if new_clip:
-            cur = self.__execute__('''select id from books where NAME = '%s'
-    ''' % book)
-
-            row = cur.fetchone()
-            if row is None:
-                new_book = True
-                self.__execute__('''insert into books values (NULL, '%s')
-    ''' % book)
 
         return (new_book, new_clip)
 
@@ -346,7 +382,9 @@ select id from blacklist where book = '%s' and pos = '%s'
                             content = content[pos:] + new_content
                             pos = 0
                     else:
-                        book = handleStr(process_book_name(m.group(1)))
+                        (book, author) = process_book_name(m.group(1))
+                        book = handleStr(book)
+                        author = handleStr(author)
                         page = handleStr(m.group(2).strip())
                         time = handleStr(m.group(3).strip())
                         mark = handleStr(m.group(4).strip())
@@ -374,7 +412,7 @@ select id from blacklist where book = '%s' and pos = '%s'
 
                         (new_book, new_clip) = \
                             self.__addEntry__(
-                                book, pos_str, typ_str, time, mark)
+                                book, author, pos_str, typ_str, time, mark)
 
                         if new_book:
                             books_added += 1
@@ -479,56 +517,73 @@ select id from blacklist where book = '%s' and pos = '%s'
                 self.__cleanClipsById__(ids)
                 ret += len(dup_id)
 
-        if total_clips == 0:
-            self.dropBook(book)
-            ret += 1
-
         return ret
 
-    def getBooks(self):
+    def getBooks(self, showAll=False):
         """Return iterator of books.
         """
-        cur = self.conn.execute('''select ID, NAME from books;''')
+        if showAll:
+            sql = '''select ID, NAME from books;'''
+        else:
+            sql = '''
+select books.id, books.name, books.author
+from books where exists (
+select * from clippings where books.id = clippings.book_id);'''
+
+        cur = self.__execute__(sql)
         return BookIter(cur)
 
     def dropBook(self, book):
         sql = '''delete from books where name = '%s' ''' % book
-        self.conn.execute(sql)
+        self.__execute__(sql)
         pass
 
-    def getBooksById(self, id):
+    def getBookById(self, id):
         """Return iterator of books.
         """
-        cur = self.conn.execute(
-            '''select ID, NAME from books where ID = %d;''' % id)
+        cur = self.__execute__(
+            '''select ID, NAME, AUTHOR from books where ID = %d;''' % id)
         return BookIter(cur)
 
-    def getClipsByName(self, book):
+    def getClipsByBookName(self, book):
         sql = '''
-        select id, book, pos, content from clippings where book = '%s'
+        select clippings.id, books.name , pos, content from clippings
+inner join books on clippings.book_id = books.id and books.name = '%s'
         ''' % book
         PDEBUG('SQL: %s', sql)
-        cursor = self.conn.execute(sql)
+        cursor = self.__execute__(sql)
+        return ClipIter(cursor)
+
+    def getClipsByBookId(self, id):
+        sql = '''
+        select clippings.id, books.name , pos, content from clippings
+inner join books on clippings.book_id = books.id and books.id = %d
+        ''' % id
+        PDEBUG('SQL: %s', sql)
+        cursor = self.__execute__(sql)
         return ClipIter(cursor)
 
     def getClipById(self, id):
         sql = '''
-        select book, pos, type, date, content from clippings where id = %d
+        select books.name, pos, type, date, content from clippings
+        inner join books on clippings.book_id = books.id and  clippings.id = %d
         ''' % id
 
-        cursor = self.conn.execute(sql)
+        cursor = self.__execute__(sql)
         r = cursor.fetchone()
         return Clip(r[0], id, r[1], r[2], r[3], r[4])
 
     def searchClips(self, args):
         """Search clippings containing given keywords.
         """
-        query = '''select id, book, pos, content from clippings '''
+        query = '''
+        select clippings.id, books.name , pos, content from clippings
+        inner join books on clippings.book_id = books.id  '''
 
         if args is None:
-            cursor = self.conn.execute(query)
+            cursor = self.__execute__(query)
         elif isinstance(args, list):
-            query += "where content like ? or book like ?"
+            query += "and clippings.content like ? or book like ?"
             conds = '%' + '%'.join(args) + '%'
 
             cursor = self.conn.execute(query, (conds, conds))
@@ -552,7 +607,7 @@ select id from blacklist where book = '%s' and pos = '%s'
 
         SQL = ''' update clippings set content = '%s' where ID = %d ''' % (
             text, clip.id)
-        self.conn.execute(SQL)
+        self.__execute__(SQL)
         clip.content = text
 
         return True
@@ -562,11 +617,11 @@ select id from blacklist where book = '%s' and pos = '%s'
         """
         SQL = ''' insert into blacklist select * from clippings where ID = %d''' % clip.id
         PDEBUG('SQL: %s', SQL)
-        self.conn.execute(SQL)
+        self.__execute__(SQL)
 
         SQL = '''delete from clippings where ID = %d''' % clip.id
         PDEBUG('SQL: %s', SQL)
-        self.conn.execute(SQL)
+        self.__execute__(SQL)
 
         pass
 

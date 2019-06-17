@@ -509,22 +509,21 @@ class KlipFrame(wx.Frame):
             item = wx.ListItem()
             item.SetData(iter.id)
             item.SetId(idx)
-            item.SetText(u"    %s" % (iter.book))
+            item.SetText(u"    %s" % (iter.name))
             self.book_list.InsertItem(item)
             idx += 1
 
-        width = self.book_list.GetSize().GetWidth() * 0.5
-        self.book_list.SetColumnWidth(0, width)
+        # width = self.book_list.GetSize().GetWidth() * 0.5
+        # self.book_list.SetColumnWidth(0, width)
         self._total_books.SetLabel('BOOKS (%d)' % idx)
         return idx
 
     def OnBookSelected(self, event):
         """
         """
-        book = event.GetText().strip()
-        self._book_id = event.GetItem().GetId()
+        self._book_id = event.GetItem().GetData()
         PDEBUG('BOOK_ID: %d', self._book_id)
-        self.showClipsOfBook(book)
+        self.showClipsOfBook()
         self._clip = None
         pass
 
@@ -602,25 +601,28 @@ class KlipFrame(wx.Frame):
         PDEBUG('NOT IMPLEMENT.')
         pass
 
-    def showClipsOfBook(self, book=None):
+    def showClipsOfBook(self):
         """Show clips of book.
         """
-        if book:
-            self._book = book
 
-        if self._book is None:
-            PDEBUG('No book selected.')
-            return
+        PDEBUG('BOOK_ID: %d', self._book_id)
 
-        PDEBUG('Book: %s', self._book)
-        iter = self.model.getClipsByName(self._book)
-        self.showClips(self._book, iter)
+        book_iter = self.model.getBookById(self._book_id)
+        if not book_iter.next():
+            print('Failed to load book info, book_id: %d'%(self._book_id))
+            sys.exit(1)
+
+        book = book_iter.name
+        author  = book_iter.author
+
+        iter = self.model.getClipsByBookId(self._book_id)
+        self.showClips(book, author, iter)
         pass
 
-    def showClips(self, title, it):
+    def showClips(self, title, author, it):
         """Show contents in clip_li.s
         """
-        self.book_title.SetLabel("  %s" % title)
+        self.book_title.SetLabel("  %s -- %s" % (title, author))
         self.clip_list.DeleteAllItems()
 
         idx = 0
@@ -667,15 +669,7 @@ class KlipFrame(wx.Frame):
         # If there are no clips left for current book, ask if we should remove
         # current book...
         if self.clip_list.GetItemCount() == 0:
-            dlg = GMD.GenericMessageDialog(
-                self, 'No clips in book %s, remove this book?'%self._book, "CONFIRM",
-                wx.OK | wx.CANCEL | wx.ICON_INFORMATION)
-            val = dlg.ShowModal()
-            dlg.Destroy()
-
-            if val == 5100:
-                self.model.dropBook(self._book)
-                self.refreshContents()
+            self.refreshContents()
         pass
 
     def newClip(self, content, typ, date):

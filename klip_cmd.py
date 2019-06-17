@@ -101,7 +101,7 @@ def showFunc(args):
                 if len(args) == 1:
                     m = re.match("\\[(\\d+)\\]", args[0])
                     if m:
-                        bi = model.getBooksById(int(m.group(1)))
+                        bi = model.getBookById(int(m.group(1)))
                         if bi.next():
                             book = bi.book
 
