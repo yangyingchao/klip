@@ -5,9 +5,8 @@ import sys
 import re
 import traceback
 from klip_common import getClipPath
-from klip_model import KlipModel
 
-model = KlipModel(True)
+model = None
 
 stop = False
 

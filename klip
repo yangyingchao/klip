@@ -14,6 +14,7 @@ Utility to manage clippings from Kindle.'''
 class UIMode(Enum):
     GUI = 0
     CMD = 2
+    SRV = 3
 
 
 DEFAULT_MODE = UIMode.GUI
@@ -22,10 +23,13 @@ DEFAULT_MODE = UIMode.GUI
 parser = argparse.ArgumentParser(description=DESCRIPTION)
 parser.add_argument('--gui', dest='ui', action='store_const',
                     const=UIMode.GUI, default=DEFAULT_MODE,
-                    help='specify UI to use')
+                    help='start klip with GUI (requires wxPython)')
 parser.add_argument('--cmd', dest='ui', action='store_const',
                     const=UIMode.CMD, default=DEFAULT_MODE,
-                    help='specify UI to use')
+                    help='start klip with command line mode')
+parser.add_argument('--server', dest='server', action='store_const',
+                    const=UIMode.SRV, default=DEFAULT_MODE,
+                    help='start klip as server, so other tools can connect to it.')
 parser.add_argument('--debug', dest='debug', action='store_true',
                     default=False,
                     help='turn on debug mode')
@@ -47,5 +51,8 @@ if __name__ == '__main__':
     elif args.ui == UIMode.GUI:
         from klip_gui import startGUI
         startGUI(m)
+    elif args.ui == UIMode.SRV:
+        from klip_server import startServer
+        startServer(m)
     else:
         print('oops.')

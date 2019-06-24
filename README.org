@@ -28,3 +28,7 @@ Note:
 - [ ] Add header to refresh/cleanup/search in left panel.
 - [ ] Add header to right panel to show author & number total clips..
   [[./images/Screen Shot 2019-06-16 at 8.11.10 AM.png]]
+
+* EKlip --- Emacs on Klip
+
+Use emacs as front end for klip....
