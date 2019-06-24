@@ -438,7 +438,7 @@ select id from blacklist where book_id = '%d' and pos = '%s'
         num = 0
         iter = self.getBooks()
         while iter.next():
-            num += self.cleanUpBook(iter.book, callback)
+            num += self.cleanUpBook(iter.name, callback)
 
         PDEBUG('Total %d records cleaned up.', num)
         return num
@@ -450,7 +450,7 @@ select id from blacklist where book_id = '%d' and pos = '%s'
         clips = {}  # pos - (id, content)
         dup_id = []  # array of cons, where cdr should be dropped...
 
-        iter = self.getClipsByName(book)
+        iter = self.getClipsByBookName(book)
         total_clips = 0
         while iter.next():
             total_clips += 1

@@ -79,9 +79,9 @@ class State(Enum):
 class KlipDetailWindow(wx.PopupWindow):
     """Adds a bit of text and mouse movement to the wx.PopupWindow"""
 
-    def __init__(self, parent, style):
+    def __init__(self, parent):
 
-        wx.PopupWindow.__init__(self, parent, style)
+        wx.PopupWindow.__init__(self, parent, wx.BORDER_THEME)
 
         self.parent = parent
         self.sizer = wx.BoxSizer(wx.VERTICAL)
@@ -287,7 +287,7 @@ class KlipFrame(wx.Frame):
         sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
         sp.SetSplitMode(wx.SPLIT_VERTICAL)
         sp.SetMinimumPaneSize(50)
-        self.detailPanel = KlipDetailWindow(self, wx.SIMPLE_BORDER)
+        self.detailPanel = KlipDetailWindow(self)
         self.SetMinSize(wx.Size(800, 600))
 
         # create a panel in the frame
