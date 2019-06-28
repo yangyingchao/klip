@@ -155,8 +155,6 @@ class ClipIter(object):
         self._cursor = cursor
         super(ClipIter, self).__init__()
         self.id = None
-        self.book = None
-        self.pos = None
         self.content = None
 
     def next(self):

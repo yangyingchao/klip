@@ -50,7 +50,7 @@ def showBooks():
     iter = model.getBooks()
     while iter.next():
         counter += 1
-        print('    [%d] -- %s' % (iter.id, iter.book))
+        print('    [%d] -- %s' % (iter.id, iter.name))
 
     print('\nTotal books: %d' % (counter))
     pass
