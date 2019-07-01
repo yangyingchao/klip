@@ -6,9 +6,11 @@ import wx.html2
 import wx.lib.mixins.listctrl as listmix
 import markdown
 import os
+from wx.adv import TaskBarIcon as TaskBarIcon
 from enum import Enum
 from datetime import datetime
 from klip_common import getClipPath, PDEBUG
+from images import icons
 
 try:
     from agw import genericmessagedialog as GMD
@@ -281,8 +283,16 @@ class KlipFrame(wx.Frame):
         self._book_id = None
         self._search_target = None
 
-        super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760))
+        super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760),
+                                        title='Klip',
+                                        name='Klip')
         # ensure the parent's __init__ is called
+
+        icon = icons.klip.GetIcon()
+        self.SetIcon(icon)
+
+        self.tb = TaskBarIcon(wx.adv.TBI_DOCK)
+        self.tb.SetIcon(icon)
 
         sp = wx.SplitterWindow(self, style=wx.SP_BORDER | wx.SP_3DBORDER)
         sp.SetSplitMode(wx.SPLIT_VERTICAL)
@@ -681,6 +691,20 @@ class KlipFrame(wx.Frame):
         pass
 
 
+class KlipApp(wx.App):
+    """Klip Application.
+    """
+
+    def OnInit(self):
+        """
+        """
+        wx.SystemOptions.SetOption("mac.window-plain-transition", 1)
+        self.SetAppName("Klip")
+
+        return True
+
+
+
 def startGUI(controller):
     """
     """
@@ -692,7 +716,7 @@ def startGUI(controller):
         print('Requires wx version > 4.0')
         return
 
-    app = wx.App()
+    app = KlipApp()
     frm = KlipFrame(controller)
 
     # Show it.
