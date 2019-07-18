@@ -6,16 +6,12 @@ import wx.html2
 import wx.lib.mixins.listctrl as listmix
 import markdown
 import os
+import sys
 from wx.adv import TaskBarIcon as TaskBarIcon
 from enum import Enum
 from datetime import datetime
 from klip_common import getClipPath, PDEBUG
 from images import icons
-
-try:
-    from agw import genericmessagedialog as GMD
-except ImportError:  # if it's not there locally, try the wxPython lib.
-    import wx.lib.agw.genericmessagedialog as GMD
 
 scriptdir = os.path.dirname(os.path.realpath(__file__))
 MARKDOWN_CSS = os.path.join(scriptdir, 'styles/markdown.css')
@@ -283,7 +279,8 @@ class KlipFrame(wx.Frame):
         self._book_id = None
         self._search_target = None
 
-        super(KlipFrame, self).__init__(None, size=wx.Size(1200, 760),
+        super(KlipFrame, self).__init__(None,
+                                        size=wx.Size(1200, 760),
                                         title='Klip',
                                         name='Klip')
         # ensure the parent's __init__ is called
@@ -558,14 +555,12 @@ class KlipFrame(wx.Frame):
             self.popupID1 = wx.NewIdRef()
             self.popupID2 = wx.NewIdRef()
             self.popupID3 = wx.NewIdRef()
-            self.popupID4 = wx.NewIdRef()
             self.popupID5 = wx.NewIdRef()
             self.popupID6 = wx.NewIdRef()
 
             self.Bind(wx.EVT_MENU, self.OnNew, id=self.popupID1)
             self.Bind(wx.EVT_MENU, self.OnEdit, id=self.popupID2)
             self.Bind(wx.EVT_MENU, self.OnDelete, id=self.popupID3)
-            self.Bind(wx.EVT_MENU, self.OnDeleteAll, id=self.popupID4)
 
         # make a menu
         menu = wx.Menu()
@@ -573,7 +568,6 @@ class KlipFrame(wx.Frame):
         menu.Append(self.popupID1, "New Clip")
         menu.Append(self.popupID2, "Edit Selected")
         menu.Append(self.popupID3, "Delete Selected")
-        menu.Append(self.popupID4, "DeleteAllItems")
 
         # Popup the menu.  If an item is selected then its handler
         # will be called before PopupMenu returns.
@@ -607,12 +601,6 @@ class KlipFrame(wx.Frame):
         self.dropClip(self._clip)
         self._clip = None
 
-    def OnDeleteAll(self, evt):
-        """
-        """
-        PDEBUG('NOT IMPLEMENT.')
-        pass
-
     def showClipsOfBook(self):
         """Show clips of book.
         """
@@ -621,11 +609,11 @@ class KlipFrame(wx.Frame):
 
         book_iter = self.model.getBookById(self._book_id)
         if not book_iter.next():
-            print('Failed to load book info, book_id: %d'%(self._book_id))
+            print('Failed to load book info, book_id: %d' % (self._book_id))
             sys.exit(1)
 
         book = book_iter.name
-        author  = book_iter.author
+        author = book_iter.author
 
         iter = self.model.getClipsByBookId(self._book_id)
         self.showClips(book, author, iter)
@@ -702,7 +690,6 @@ class KlipApp(wx.App):
         self.SetAppName("Klip")
 
         return True
-
 
 
 def startGUI(controller):
