@@ -120,7 +120,7 @@ def showFunc(args):
 def showGUI(args):
     """Show GUI
     """
-    from gui import startGUI
+    from klip_gui import startGUI
     startGUI(model)
     pass
 

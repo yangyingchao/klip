@@ -74,6 +74,7 @@ def process_book_name(name):
 def getDBPath(readonly=False):
     """Return path of database.
     """
+    path=None
     if sys.platform == 'darwin':
         path = '%s/Library/Application Support/Klip/' % os.getenv("HOME")
     else:
