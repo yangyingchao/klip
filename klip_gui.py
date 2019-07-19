@@ -692,7 +692,7 @@ class KlipApp(wx.App):
         return True
 
 
-def startGUI(controller):
+def startGUI(model_):
     """
     """
 
@@ -704,7 +704,7 @@ def startGUI(controller):
         return
 
     app = KlipApp()
-    frm = KlipFrame(controller)
+    frm = KlipFrame(model_)
 
     # Show it.
     frm.Show()
