@@ -68,7 +68,7 @@ def showClipIter(it):
 
 def showClipsByName(book):
     print('Showing clips from book: %s' % book)
-    num = showClipIter(model.getClipsByName(book))
+    num = showClipIter(model.getClipsByBookName(book))
     return num
 
 
@@ -102,7 +102,7 @@ def showFunc(args):
                     if m:
                         bi = model.getBookById(int(m.group(1)))
                         if bi.next():
-                            book = bi.book
+                            book = bi.name
 
                 if book is None:
                     book = " ".join(args[1:])

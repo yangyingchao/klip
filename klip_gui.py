@@ -23,13 +23,11 @@ class MarkdownDoc:
 
         self.inline_css = ''
 
-        if markdown_css:
-            with open(markdown_css) as markdown_css_file:
-                self.inline_css += markdown_css_file.read()
+        with open(MARKDOWN_CSS) as markdown_css_file:
+            self.inline_css += markdown_css_file.read()
 
-        if pygments_css:
-            with open(pygments_css) as pygments_css_file:
-                self.inline_css += pygments_css_file.read()
+        with open(PYGMENTS_CSS) as pygments_css_file:
+            self.inline_css += pygments_css_file.read()
 
         self.md = markdown.Markdown()
 
