@@ -4,7 +4,7 @@
 import sys
 import re
 import traceback
-from klip_common import getClipPath
+from klip_common import getClipPath, getKindleDir
 
 model = None
 
@@ -165,6 +165,31 @@ def searchClips(args):
     showClipIter(model.searchClips(args))
 
 
+def cleanupDeviceCallback(lst):
+    if lst:
+        print('Going to remove following directories: %s\n')
+        idx = 1
+        for dir in lst:
+            print('[%d] -- %s' % (idx, dir))
+            idx += 1
+
+        print('\nContintue? Y/[N]')
+
+        line = sys.stdin.readline().lower().strip()
+        if len(line) == 0:
+            return True
+        if len(line) == 1 and line[0] == 'y':
+            return True
+        return False
+    return True
+
+
+def cleanDevice(args):
+    """Clean up kindle device.
+    """
+    model.cleanUpDevice(getKindleDir(), cleanupDeviceCallback)
+
+
 handlers = {
     "load": loadFile,
     "help": showHelp,
@@ -176,6 +201,7 @@ handlers = {
     "clean": cleanUp,
     "gui": showGUI,
     'search': searchClips,
+    'clean_dev' : cleanDevice,
 }
 
 

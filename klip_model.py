@@ -518,6 +518,36 @@ select id from blacklist where book_id = '%d' and pos = '%s'
 
         return ret
 
+    def cleanUpDevice(self, path, callback=None):
+        """
+        """
+        lst=[]
+
+        for (root, dirnames, filenames) in os.walk(path):
+            for dir in dirnames:
+                dir = os.path.join(root, dir)
+                if not os.listdir(dir):
+                    if not dir.endswith('.sdr'):
+                        lst.append(dir)
+                    else:
+                        # folder is empty, check if corresponding book still available..
+                        found = False
+                        dir_base = dir[:-4]
+                        for fn in filenames:
+                            if fn.startswith(dir_base):
+                                found = True
+                                break
+
+                        if not found:
+                            lst.append(dir)
+
+        if lst:
+            if not callback or callback(lst):
+                for dir in lst:
+                    os.rmdir(dir)
+        pass
+
+
     def getBooks(self, showAll=False):
         """Return iterator of books.
         """

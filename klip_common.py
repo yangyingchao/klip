@@ -22,6 +22,10 @@ def getClipPath():
     return os.path.join(os.path.dirname(__file__), "My Clippings.txt")
 
 
+def getKindleDir():
+    return os.path.dirname(getClipPath())
+
+
 def myhash(value):
     """
 
