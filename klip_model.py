@@ -78,7 +78,11 @@ def getDBPath(readonly=False):
     if sys.platform == 'darwin':
         path = '%s/Library/Application Support/Klip/' % os.getenv("HOME")
     else:
-        raise Exception("Platform %s not support." % sys.platform)
+        home = os.getenv('HOME')
+        if home is None:
+            raise Exception("Platform %s not support." % sys.platform)
+        else:
+            path = '%s/.config/klip' % (os.getenv('HOME'))
 
     if not os.path.exists(path):
         os.mkdir(path)

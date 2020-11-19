@@ -13,6 +13,8 @@ def getClipPath():
 
     if sys.platform == 'darwin':
         path = "/Volumes/Kindle/documents/My Clippings.txt"
+    elif sys.platform == 'linux':
+        path = '/run/media/%s/Kindle/documents/My Clippings.txt' % (os.getenv('USER'))
     else:
         Exception("Platform %s not support." % sys.platform)
 
