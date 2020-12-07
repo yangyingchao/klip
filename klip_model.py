@@ -82,7 +82,7 @@ def getDBPath(readonly=False):
         if home is None:
             raise Exception("Platform %s not support." % sys.platform)
         else:
-            path = '%s/.config/klip' % (os.getenv('HOME'))
+            path = '%s/.config/klip/' % (os.getenv('HOME'))
 
     if not os.path.exists(path):
         os.mkdir(path)
@@ -91,6 +91,7 @@ def getDBPath(readonly=False):
     if readonly:
         path += '?mode = ro'
 
+    PDEBUG('DB_PATH: %s', path)
     return path
 
 
@@ -198,7 +199,7 @@ class Range(object):
 
 
 class KlipModel(object):
-    def __init__(self, readonly=False, trial=False):
+    def __init__(self, trial=False):
         """
         """
         super(KlipModel, self).__init__()
@@ -246,6 +247,7 @@ select * from clippings limit 0''', True)
         Execute sql, and commit commit if asked.
         """
         cursor = None
+        PDEBUG('Executing SQL: %s'%sql)
         try:
             cursor = self.conn.execute(sql)
         except sqlite3.IntegrityError as e:
@@ -307,7 +309,7 @@ select * from clippings limit 0''', True)
 
         # check if record is in blacklist.
         cur = self.__execute__('''
-select id from blacklist where book_id = '%d' and pos = '%s'
+select id from blacklist where book = '%d' and pos = '%s'
 ''' % (book_id, pos))
 
         row = cur.fetchone()
@@ -317,7 +319,7 @@ select id from blacklist where book_id = '%d' and pos = '%s'
             new_clip = False
         else:
             cur = self.__execute__('''
-    select id from clippings where book_id = %d and pos = '%s'
+    select id from clippings where book = %d and pos = '%s'
     ''' % (book_id, pos))
 
             row = cur.fetchone()
@@ -561,7 +563,7 @@ select id from blacklist where book_id = '%d' and pos = '%s'
             sql = '''
 select books.id, books.name, books.author
 from books where exists (
-select * from clippings where books.id = clippings.book_id);'''
+select * from clippings where books.id = clippings.book);'''
 
         cur = self.__execute__(sql)
         return BookIter(cur)
@@ -581,7 +583,7 @@ select * from clippings where books.id = clippings.book_id);'''
     def getClipsByBookName(self, book):
         sql = '''
         select clippings.id, books.name , pos, content from clippings
-inner join books on clippings.book_id = books.id and books.name = '%s'
+inner join books on clippings.book = books.id and books.name = '%s'
         ''' % book
         PDEBUG('SQL: %s', sql)
         cursor = self.__execute__(sql)
@@ -590,7 +592,7 @@ inner join books on clippings.book_id = books.id and books.name = '%s'
     def getClipsByBookId(self, id):
         sql = '''
         select clippings.id, books.name , pos, content from clippings
-inner join books on clippings.book_id = books.id and books.id = %d
+inner join books on clippings.book = books.id and books.id = %d
         ''' % id
         PDEBUG('SQL: %s', sql)
         cursor = self.__execute__(sql)
@@ -599,7 +601,7 @@ inner join books on clippings.book_id = books.id and books.id = %d
     def getClipById(self, id):
         sql = '''
         select books.name, pos, type, date, content from clippings
-        inner join books on clippings.book_id = books.id and  clippings.id = %d
+        inner join books on clippings.book = books.id and  clippings.id = %d
         ''' % id
 
         cursor = self.__execute__(sql)
@@ -611,7 +613,7 @@ inner join books on clippings.book_id = books.id and books.id = %d
         """
         query = '''
         select clippings.id, books.name , pos, content from clippings
-        inner join books on clippings.book_id = books.id  '''
+        inner join books on clippings.book = books.id  '''
 
         if args is None:
             cursor = self.__execute__(query)

@@ -4,7 +4,7 @@
 import sys
 import re
 import traceback
-from klip_common import getClipPath, getKindleDir
+from klip_common import getClipPath, getKindleDir, PDEBUG
 
 model = None
 
@@ -12,8 +12,7 @@ stop = False
 
 
 def loadFile(args):
-    """Load clippings from file (if specified), or from default file.
-    """
+    """ Load clippings from file (if specified), or from default file. """
     if args:
         path = args[0]
     else:
@@ -24,27 +23,24 @@ def loadFile(args):
 
 
 def showHelp(args):
-    """  Show  help message.
-    """
+    """ Show  help message."""
     print('Show help message...\n')
 
     for key in handlers.keys():
         func = handlers[key]
-        print('    %s: %s' % (key, func.__doc__))
+        print('  %s: %s' % (key, func.__doc__))
     pass
 
 
 def exitFunc(args):
-    """exit klip.
-    """
+    """ exit klip."""
     global stop
     stop = True
     pass
 
 
 def showBooks():
-    """ Show books.
-    """
+    """ Show books.    """
     print('Showing books:')
     counter = 0
     iter = model.getBooks()
@@ -73,22 +69,21 @@ def showClipsByName(book):
 
 
 def showClips():
-    """ Show Clips from all books.
-    """
+    """ Show Clips from all books.    """
     counter_book = 0
     counter_clips = 0
     iter_book = model.getBooks()
     while iter_book.next():
         counter_book += 1
-        counter_clips += showClipsByName(iter_book.book)
+        counter_clips += showClipsByName(iter_book.name)
 
     print('\nTotal books: %d, total clips: %d' % (counter_book, counter_clips))
 
 
 def showFunc(args):
-    """ Show books or clips.
-    eg, show books
-        show clips
+    """ Show books or clips, eg:
+             show books
+             show clips [book_number]
     """
     if args:
         target = args.pop(0).lower()
@@ -96,9 +91,11 @@ def showFunc(args):
             showBooks()
         elif target == "clips":
             if args:
+                PDEBUG('ARGS: %s', args)
                 book = None
                 if len(args) == 1:
                     m = re.match("\\[(\\d+)\\]", args[0])
+                    PDEBUG('Match: %s', m)
                     if m:
                         bi = model.getBookById(int(m.group(1)))
                         if bi.next():
@@ -118,8 +115,7 @@ def showFunc(args):
 
 
 def showGUI(args):
-    """Show GUI
-    """
+    """Show GUI    """
     from klip_gui import startGUI
     startGUI(model)
     pass
@@ -148,8 +144,7 @@ def cleanupCallback(book, lst):
 
 
 def cleanUp(books=None):
-    """Clean clippings, by removing duplicated records.
-    """
+    """Clean clippings, by removing duplicated records.    """
     if books:
         for book in books:
             model.cleanUpBook(book, cleanupCallback)
@@ -193,7 +188,6 @@ def cleanDevice(args):
 handlers = {
     "load": loadFile,
     "help": showHelp,
-    "/h": showHelp,
     "exit": exitFunc,
     "quit": exitFunc,
     "q": exitFunc,
@@ -208,7 +202,7 @@ handlers = {
 def startCMD(model_):
     global model
     model = model_
-    print('Input your commands here, type "/h" for help.. ')
+    print('Input your commands here, type "help" for help.. ')
     while not stop:
         try:
             print('>')
